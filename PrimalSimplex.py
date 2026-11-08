@@ -21,19 +21,8 @@ def primal_simplex(c, A, b, signs, objective="max", max_iterations=1000):
 
     #Проверка наличия начального базиса
     if basis is None:
-        add_text_step(
-            steps,
-            "Формирование начального базиса",
-            "Не удалось сформировать единичный базис. Для дальнейшего решения необходим метод искусственного базиса."
-        )
-        return {
-            "status": "artificial_basis_required",
-            "message": "Используется метод искусственного базиса.",
-            "solution": None,
-            "objective_value": None,
-            "steps": steps,
-            "problem": problem
-        }
+        from MIB import artificial_basis_simplex
+        return artificial_basis_simplex(c, A, b, signs, objective, max_iterations)
 
     #Сохранение информации о сформированном базисе
     add_text_step(
