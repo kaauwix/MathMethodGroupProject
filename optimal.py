@@ -1,3 +1,5 @@
+#Проверка оптимальности плана
+
 from AuxiliaryFun import EPSILON
 
 

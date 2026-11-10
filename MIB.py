@@ -1,16 +1,14 @@
-from AuxiliaryFun import (
-    add_text_step, add_table_step, normalize_problem, find_initial_basis,
-    calculate_deltas, pivot_operation, build_tableau, make_result, EPSILON
-)
+#Метод искусственного базиса
 
+from AuxiliaryFun import ( add_text_step, add_table_step, find_initial_basis,
+    calculate_deltas, pivot_operation, build_tableau, make_result, EPSILON)
 
-def artificial_basis_simplex(c, A, b, signs, objective="max", max_iterations=1000):
+def artificial_basis_prepared(problem, max_iterations=1000):
     """
-    Решает задачу ЛП методом искусственного базиса.
-    Возвращает результат в формате make_result.
+    Выполняет метод искусственного базиса для уже нормализованной задачи.
+    Этапы метода, проверка вспомогательной задачи и удаление искусственных
+    переменных остаются такими же, как в исходной реализации.
     """
-    # 1. Приведение к канонической форме
-    problem = normalize_problem(c, A, b, signs, objective)
     steps = problem["steps"]
     original_count = problem["original_variables_count"]
     objective_factor = problem["objective_factor"]
@@ -196,55 +194,7 @@ def artificial_basis_simplex(c, A, b, signs, objective="max", max_iterations=100
                    "Начальная таблица исходной задачи")
 
     # 10. Запуск прямого симплекс-метода
-    from PrimalSimplex import primal_simplex
-    # но primal_simplex сам нормализует задачу, поэтому проще продолжить здесь
-    for iteration in range(1, max_iterations + 1):
-        deltas = calculate_deltas(tableau, c_original, basis)
-        negative = [j for j, d in enumerate(deltas) if d < -EPSILON and j not in basis]
-        if not negative:
-            solution = [0.0] * len(c_original)
-            for i, j in enumerate(basis):
-                solution[j] = tableau[i][-1]
-            original_solution = solution[:original_count]
-            obj = sum(problem["original_c"][j] * original_solution[j]
-                      for j in range(original_count))
-            add_text_step(steps, "Оптимум найден",
-                          "Все Delta_j >= 0. Оптимальное решение найдено.",
-                          {"solution": original_solution, "objective_value": obj})
-            return make_result("optimal", "Оптимальное решение найдено.",
-                               steps, solution=original_solution,
-                               objective_value=obj, tableau=tableau,
-                               basis=basis, deltas=deltas, problem=problem)
+    # На этом этапе искусственные переменные уже удалены, а допустимый базис сформирован
+    from PrimalSimplex import primal_simplex_prepared
 
-        pivot_col = min(negative, key=lambda j: deltas[j])
-        ratios = []
-        for i in range(len(tableau)):
-            coef = tableau[i][pivot_col]
-            if coef > EPSILON:
-                ratios.append((tableau[i][-1] / coef, i))
-        if not ratios:
-            message = "Целевая функция не ограничена сверху."
-            add_text_step(steps, "Проверка ограниченности", message)
-            return make_result("unbounded", message, steps,
-                               tableau=tableau, basis=basis,
-                               deltas=deltas, problem=problem)
-        _, pivot_row = min(ratios, key=lambda item: (item[0], basis[item[1]]))
-        pivot_info = {
-            "row": pivot_row, "column": pivot_col,
-            "value": tableau[pivot_row][pivot_col],
-            "entering_variable": variable_names[pivot_col],
-            "leaving_variable": variable_names[basis[pivot_row]]
-        }
-        add_text_step(steps, "Выбор разрешающего элемента",
-                      f"Входит {variable_names[pivot_col]}, выходит {variable_names[basis[pivot_row]]}.",
-                      pivot_info)
-        pivot_operation(tableau, pivot_row, pivot_col)
-        basis[pivot_row] = pivot_col
-        add_table_step(steps, tableau, basis, variable_names, c_original,
-                       f"Итерация {iteration} прямого симплекс-метода",
-                       pivot=pivot_info)
-
-    return make_result("iteration_limit", "Превышено число итераций.",
-                       steps, tableau=tableau, basis=basis,
-                       deltas=calculate_deltas(tableau, c_original, basis),
-                       problem=problem)
+    return primal_simplex_prepared(problem, tableau, basis, max_iterations)
