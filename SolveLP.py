@@ -1,24 +1,9 @@
-# SolveLP.py
-from PrimalSimplex import primal_simplex
-from DualSimplex import dual_simplex
-from AuxiliaryFun import normalize_problem, find_initial_basis
+# Одновременное решение прямой и двойственной
+from MethodSelection import solve_problem
 import numpy as np
 
 def _safe_solve(c, A, b, signs, objective):
-    try:
-        problem = normalize_problem(c, A, b, signs, objective)
-        has_basis = find_initial_basis(problem["A"]) is not None
-    except Exception:
-        has_basis = True
-
-    if has_basis:
-        res = primal_simplex(c, A, b, signs, objective)
-        if res["status"] == "dual_simplex":
-            res = dual_simplex(c, A, b, signs, objective)
-    else:
-        from MIB import artificial_basis_simplex
-        res = artificial_basis_simplex(c, A, b, signs, objective)
-    return res
+    return solve_problem(c, A, b, signs, objective)
 
 def solve_primal_and_dual(c, A, b, signs, objective="max"):
     # 1. Решаем прямую задачу
