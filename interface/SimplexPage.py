@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QGroupBox, QComboBox, QScrollArea,
-    QFrame, QSpinBox, QGridLayout, QSizePolicy
+    QFrame, QSpinBox
 )
 from PyQt5.QtCore import Qt
 from MethodSelection import solve_problem
@@ -60,7 +60,7 @@ class SimplexPage(QWidget):
         self.scroll_layout.setSpacing(15)
         
         scroll.setWidget(self.scroll_content)
-        main_layout.addWidget(scroll, 1) # 1 - чтобы занимало всё свободное место
+        main_layout.addWidget(scroll, 1)
 
         # ==========================================
         # БЛОК 3: РЕЗУЛЬТАТ
@@ -99,7 +99,7 @@ class SimplexPage(QWidget):
         self.obj_combo.addItems(["max", "min"])
         obj_layout.addWidget(QLabel("f(x) ="))
         obj_layout.addWidget(self.obj_combo)
-        obj_layout.addWidget(QLabel(":")) # Просто для вида
+        obj_layout.addWidget(QLabel(":")) 
 
         for i in range(self.n_vars):
             if i > 0:
@@ -112,7 +112,6 @@ class SimplexPage(QWidget):
             self.var_inputs.append(inp)
             obj_layout.addWidget(inp)
             
-            # Красивая метка x_1, x_2
             lbl = QLabel(f"x<sub>{i+1}</sub>")
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
@@ -128,8 +127,6 @@ class SimplexPage(QWidget):
         for i in range(self.m_cons):
             row_layout = QHBoxLayout()
             row_layout.setAlignment(Qt.AlignLeft)
-            row_signs = []
-            row_b = None
 
             for j in range(self.n_vars):
                 if j > 0:
@@ -146,14 +143,12 @@ class SimplexPage(QWidget):
                 lbl.setStyleSheet("font-size: 20px;")
                 row_layout.addWidget(lbl)
 
-            # Выбор знака
             sign_combo = QComboBox()
             sign_combo.addItems(["<=", ">=", "="])
             sign_combo.setFixedWidth(60)
             self.cons_signs.append(sign_combo)
             row_layout.addWidget(sign_combo)
 
-            # Правая часть
             b_inp = QLineEdit()
             b_inp.setFixedWidth(60)
             b_inp.setAlignment(Qt.AlignCenter)
@@ -175,6 +170,9 @@ class SimplexPage(QWidget):
         self.scroll_layout.addWidget(solve_btn)
         self.scroll_layout.addStretch()
 
+    # ==========================================
+    # ОБРАБОТКА НАЖАТИЯ КНОПКИ "РЕШИТЬ"
+    # ==========================================
     def on_solve(self):
         try:
             # 1. Собираем целевую функцию
@@ -184,7 +182,6 @@ class SimplexPage(QWidget):
             # 2. Собираем ограничения
             A = []
             for i in range(self.m_cons):
-                # Берем нужный кусок из плоского списка cons_inputs
                 row = [float(self.cons_inputs[i * self.n_vars + j].text()) for j in range(self.n_vars)]
                 A.append(row)
 
@@ -200,10 +197,17 @@ class SimplexPage(QWidget):
             self.result_output.append(f"<b>Сообщение:</b> {result.get('message')}")
             
             if result.get('solution') is not None:
-                self.result_output.append(f"<b>Решение:</b> {result['solution']}")
-                self.result_output.append(f"<b>Значение функции:</b> {result['objective_value']}")
+                # Красиво форматируем решение (без лишних нулей)
+                sol_str = ", ".join([f"{x:g}" for x in result['solution']])
+                self.result_output.append(f"<b>Решение (x):</b> {sol_str}")
                 
-        except ValueError as e:
-            self.result_output.setText(f"<span style='color:red;'>Ошибка ввода: убедитесь, что все поля заполнены числами!</span>")
+                obj_val = result.get('objective_value')
+                if obj_val is not None:
+                    self.result_output.append(f"<b>Значение функции (f):</b> {obj_val:g}")
+            else:
+                self.result_output.append("<span style='color:red;'>Оптимальное решение не найдено.</span>")
+
+        except ValueError:
+            self.result_output.setText("<span style='color:red;'>Ошибка ввода: убедитесь, что все поля заполнены числами!</span>")
         except Exception as e:
             self.result_output.setText(f"<span style='color:red;'>Ошибка решения: {e}</span>")
