@@ -3,13 +3,24 @@
 from AuxiliaryFun import EPSILON
 
 
-def check_optimality(c, A, b, x, signs, tolerance=1e-7):
+def check_optimality(c, A, b, x, signs, var_types=None, tolerance=1e-7):
     """
-    Работает для задач вида: f=(c,x)->max, A x <= b, x >= 0.
+    Работает для задач вида: f=(c,x)->max, A x <= b.
+    Для свободных переменных (var_types[j] == "free") нет ограничения x_j >= 0,
+    а условие дополняющей нежёсткости — всегда равенство (A^j, y) = c_j.
     Возвращает: dict(status, message, y=None или найденное y, details)
     """
     n = len(c)
     m = len(A)
+
+    if var_types is None:
+        var_types = ["nonneg"] * n
+    if len(var_types) != n:
+        return {
+            "status": "error",
+            "message": "Длина var_types не совпадает с числом переменных.",
+            "y": None
+        }
 
     A_norm = [row[:] for row in A]
     b_norm = b[:]
@@ -33,20 +44,24 @@ def check_optimality(c, A, b, x, signs, tolerance=1e-7):
                 "y": None
             }
     for j in range(n):
-        if x[j] < -tolerance:
+        if var_types[j] == "nonneg" and x[j] < -tolerance:
             return {
                 "status": "not_feasible",
-                "message": f"x_{j+1} < 0.",
+                "message": f"x_{j+1} < 0 (переменная неотрицательна).",
                 "y": None
             }
 
     # 2. Множества J_x и I_x
-    J_x = [j for j in range(n) if x[j] > tolerance]
+    #    J_x — неотрицательные переменные со строго положительным значением
+    #    I_x — ограничения, которые выполняются как строгие неравенства
+    J_x = [j for j in range(n) if var_types[j] == "nonneg" and x[j] > tolerance]
     I_x = [i for i in range(m2)
            if sum(A_norm[i][j] * x[j] for j in range(n)) < b_norm[i] - tolerance]
 
     # 3. Система уравнений относительно y
-    # (A^j, y) = c_j для j in J_x;  y_i = 0 для i in I_x
+    #    (A^j, y) = c_j для j in J_x (неотрицательные с x_j > 0)
+    #    (A^j, y) = c_j для всех свободных j (всегда)
+    #    y_i = 0 для i in I_x
     # Неизвестные: y_0..y_{m2-1}, все >= 0
 
     try:
@@ -61,10 +76,18 @@ def check_optimality(c, A, b, x, signs, tolerance=1e-7):
     # Матрица системы: строки — уравнения, столбцы — y_i
     eq_rows = []
     rhs = []
-    # Условия (A^j, y) = c_j
+
+    # Условия (A^j, y) = c_j для неотрицательных с x_j > 0
     for j in J_x:
         eq_rows.append([A_norm[i][j] for i in range(m2)])
         rhs.append(c[j])
+
+    # Условия (A^j, y) = c_j для свободных переменных (всегда)
+    for j in range(n):
+        if var_types[j] == "free":
+            eq_rows.append([A_norm[i][j] for i in range(m2)])
+            rhs.append(c[j])
+
     # Условия y_i = 0
     for i in I_x:
         row = [0.0] * m2
@@ -112,8 +135,10 @@ def check_optimality(c, A, b, x, signs, tolerance=1e-7):
             "y": y_candidate.tolist()
         }
 
-    # Проверка A^T y >= c
+    # Проверка A^T y >= c — только для неотрицательных переменных
     for j in range(n):
+        if var_types[j] == "free":
+            continue
         val = sum(A_norm[i][j] * y_candidate[i] for i in range(m2))
         if val < c[j] - tolerance:
             return {

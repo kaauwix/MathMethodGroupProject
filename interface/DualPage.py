@@ -15,6 +15,7 @@ class DualPage(QWidget):
         self.m_cons = 2
 
         self.var_inputs = []
+        self.var_type_combos = []
         self.cons_inputs = []
         self.cons_signs = []
         self.cons_b_inputs = []
@@ -92,6 +93,7 @@ class DualPage(QWidget):
                 item.widget().deleteLater()
 
         self.var_inputs.clear()
+        self.var_type_combos.clear()
         self.cons_inputs.clear()
         self.cons_signs.clear()
         self.cons_b_inputs.clear()
@@ -121,6 +123,13 @@ class DualPage(QWidget):
             lbl = QLabel(f"x<sub>{i+1}</sub>")
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
+
+            type_combo = QComboBox()
+            type_combo.addItem("≥ 0", "nonneg")
+            type_combo.addItem("свободная", "free")
+            type_combo.setFixedWidth(110)
+            self.var_type_combos.append(type_combo)
+            obj_layout.addWidget(type_combo)
 
         obj_layout.addStretch()
         obj_group.setLayout(obj_layout)
@@ -209,6 +218,7 @@ class DualPage(QWidget):
         try:
             c = [float(inp.text()) for inp in self.var_inputs]
             objective = self.obj_combo.currentText()
+            var_types = [combo.currentData() for combo in self.var_type_combos]
 
             A = []
             for i in range(self.m_cons):
@@ -219,7 +229,7 @@ class DualPage(QWidget):
             b = [float(inp.text()) for inp in self.cons_b_inputs]
             signs = [combo.currentText() for combo in self.cons_signs]
 
-            res = solve_primal_and_dual(c, A, b, signs, objective)
+            res = solve_primal_and_dual(c, A, b, signs, objective, var_types=var_types)
 
             # --- Прямая ---
             self.tab_primal.clear()
@@ -277,6 +287,20 @@ class DualPage(QWidget):
                 self.tab_form.append(f"Правые части (c): {form['b']}")
                 self.tab_form.append(f"Знаки: {form['signs']}")
                 self.tab_form.append("y >= 0")
+
+                # Пояснение про свободные переменные
+                if form.get("var_types") and any(
+                    t == "free" for t in form["var_types"]
+                ):
+                    free_idx = [
+                        j + 1 for j, t in enumerate(form["var_types"])
+                        if t == "free"
+                    ]
+                    self.tab_form.append(
+                        "<br><i>Для свободных переменных прямой задачи "
+                        f"x_{{{', '.join(map(str, free_idx))}}} в двойственной "
+                        "условие имеет вид равенства.</i>"
+                    )
             else:
                 self.tab_form.setText(
                     "Явная формулировка недоступна "

@@ -1,5 +1,8 @@
 #Двойственный симплекс
-from AuxiliaryFun import add_text_step, add_table_step, calculate_deltas, pivot_operation, recover_solution, make_result, EPSILON
+from AuxiliaryFun import (
+    add_text_step, add_table_step, calculate_deltas, pivot_operation,
+    recover_solution, make_result, collapse_solution, EPSILON
+)
 
 def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000, force=False):
     """
@@ -13,7 +16,7 @@ def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000, force=Fa
     c = problem["c"]
     names = problem["variable_names"]
     steps = problem["steps"]
-    original_count = problem["original_variables_count"]
+    mapping = problem["mapping"]
     original_c = problem["original_c"]
 
     # Сохраняем начальную таблицу.
@@ -48,10 +51,10 @@ def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000, force=Fa
 
             # Восстанавливаем значения переменных.
             all_values = recover_solution(tableau, basis, len(c))
-            # Оставляем только исходные переменные.
-            solution = all_values[:original_count]
+            # Сворачиваем свободные переменные обратно.
+            solution = collapse_solution(all_values, mapping)
             # Вычисляем значение исходной целевой функции.
-            objective_value = sum(original_c[j] * solution[j] for j in range(original_count))
+            objective_value = sum(original_c[j] * solution[j] for j in range(len(original_c)))
 
             add_text_step(
                 steps, "Получение оптимального решения", "Выписываем значения исходных переменных и вычисляем значение целевой функции.",

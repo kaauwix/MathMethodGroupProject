@@ -1,5 +1,9 @@
 #Прямой симплекс
-from AuxiliaryFun import add_text_step, add_table_step, normalize_problem, find_initial_basis, calculate_deltas, determine_method, pivot_operation, build_tableau, recover_solution, make_result, EPSILON
+from AuxiliaryFun import (
+    add_text_step, add_table_step, normalize_problem, find_initial_basis,
+    calculate_deltas, determine_method, pivot_operation, build_tableau,
+    recover_solution, make_result, collapse_solution, EPSILON
+)
 
 def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
     """
@@ -12,7 +16,7 @@ def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
     c = problem["c"]
     names = problem["variable_names"]
     steps = problem["steps"]
-    original_count = problem["original_variables_count"]
+    mapping = problem["mapping"]
     original_c = problem["original_c"]
 
     # Сохраняем начальную симплексную таблицу.
@@ -43,12 +47,12 @@ def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
         if not negative_columns:
             add_text_step(steps, "Проверка критерия оптимальности", "Все оценки Delta_j неотрицательны. Оптимальное решение найдено.")
 
-            # Восстанавливаем значения всех переменных.
+            # Восстанавливаем значения всех переменных (в расширенном пространстве).
             all_values = recover_solution(tableau, basis, len(c))
-            # Оставляем только исходные переменные x1, x2, ...
-            solution = all_values[:original_count]
+            # Сворачиваем свободные переменные обратно.
+            solution = collapse_solution(all_values, mapping)
             # Вычисляем значение исходной целевой функции.
-            objective_value = sum(original_c[j] * solution[j] for j in range(original_count))
+            objective_value = sum(original_c[j] * solution[j] for j in range(len(original_c)))
 
             add_text_step(steps, "Итоговое решение", "Выписываем значения исходных переменных и вычисляем значение целевой функции.",
                 {"solution": solution[:], "objective_value": objective_value})

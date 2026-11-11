@@ -3,31 +3,49 @@
 from AuxiliaryFun import (
     normalize_problem, build_tableau, find_initial_basis,
     determine_method, add_text_step, make_result,
-    calculate_deltas, EPSILON
+    calculate_deltas, expand_free_variables, collapse_solution, EPSILON
 )
 
 
-def force_prepare_dual(c, A, b, signs, objective):
+def force_prepare_dual(c, A, b, signs, objective, var_types=None):
     """
     Принудительно приводит задачу к виду для двойственного симплекса:
-    умножает >= на -1, добавляет слабые переменные +1.
-    ВАЖНО: slack добавляется ТОЛЬКО для неравенств (<= или >=).
-    Для строк '=' slack не добавляется, иначе ломается равенство.
+    - свободные переменные заменяются x = x' - x'';
+    - умножает >= на -1;
+    - добавляет слабые переменные +1 для неравенств.
     """
-    m = len(A)
     n = len(c)
-    work_A = [row[:] for row in A]
-    work_b = list(b)
+    if var_types is None:
+        var_types = ["nonneg"] * n
+
+    original_c = [float(v) for v in c]
+    original_A = [[float(v) for v in row] for row in A]
+    original_b = [float(v) for v in b]
+
+    # 0. Расширяем свободные переменные
+    exp_c, exp_A, mapping, base_names = expand_free_variables(
+        original_c, original_A, var_types
+    )
+
+    m = len(exp_A)
+    n_exp = len(exp_c)
+    work_A = [row[:] for row in exp_A]
+    work_b = list(original_b)
     work_signs = list(signs)
 
     factor = 1.0 if objective == "max" else -1.0
-    work_c = [factor * v for v in c]
-    names = [f"x{i+1}" for i in range(n)]
+    work_c = [factor * v for v in exp_c]
+    names = base_names[:]
 
     steps = []
     add_text_step(steps, "Подготовка к двойственному симплексу",
                   "Умножаем ограничения >= на -1, чтобы получить отрицательные свободные члены, "
                   "и добавляем слабые переменные только для неравенств. Равенства не трогаем.")
+
+    if any(kind == "free" for (_, kind, _, _) in mapping):
+        free_list = [f"x{j+1}" for (j, kind, _, _) in mapping if kind == "free"]
+        add_text_step(steps, "Замена свободных переменных",
+                      f"Свободные переменные {', '.join(free_list)} заменены на x = x' - x''.")
 
     # 1. Умножаем >= на -1 (чтобы получить отрицательные b)
     for i in range(m):
@@ -60,10 +78,12 @@ def force_prepare_dual(c, A, b, signs, objective):
         "b": work_b,
         "signs": work_signs,
         "variable_names": names,
-        "original_c": list(c),
-        "original_A": [row[:] for row in A],
-        "original_b": list(b),
-        "original_variables_count": n,
+        "original_c": original_c,
+        "original_A": original_A,
+        "original_b": original_b,
+        "original_variables_count": n_exp,
+        "original_var_types": var_types[:],
+        "mapping": mapping,
         "objective": objective,
         "objective_factor": factor,
         "steps": steps,
@@ -73,11 +93,14 @@ def force_prepare_dual(c, A, b, signs, objective):
 
 
 def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
-                  force_method=None):
+                  force_method=None, var_types=None):
+
+    if var_types is None:
+        var_types = ["nonneg"] * len(c)
 
     # 0. ПРИНУДИТЕЛЬНЫЙ ДВОЙСТВЕННЫЙ
     if force_method == "dual":
-        res = force_prepare_dual(c, A, b, signs, objective)
+        res = force_prepare_dual(c, A, b, signs, objective, var_types=var_types)
         if res is None:
             return make_result(
                 "dual_not_applicable",
@@ -94,13 +117,13 @@ def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
 
     # 1. ПРИНУДИТЕЛЬНЫЙ МИБ
     if force_method == "mib":
-        problem = normalize_problem(c, A, b, signs, objective)
+        problem = normalize_problem(c, A, b, signs, objective, var_types=var_types)
         from MIB import artificial_basis_prepared
         return artificial_basis_prepared(problem, max_iterations)
 
     # 2. ПРОВЕРЯЕМ ДОСТУПНОСТЬ ДВОЙСТВЕННОГО (не решаем, только собираем инфо)
     dual_info = None
-    dual_res = force_prepare_dual(c, A, b, signs, objective)
+    dual_res = force_prepare_dual(c, A, b, signs, objective, var_types=var_types)
     if dual_res is not None:
         tableau_d, basis_d, work_c_d, names_d, problem_d = dual_res
         deltas_d = calculate_deltas(tableau_d, work_c_d, basis_d)
@@ -132,7 +155,7 @@ def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
             }
 
     # 3. ОБЫЧНЫЙ АВТОВЫБОР (нормализованная задача)
-    problem = normalize_problem(c, A, b, signs, objective)
+    problem = normalize_problem(c, A, b, signs, objective, var_types=var_types)
     steps = problem["steps"]
     tableau = build_tableau(problem["A"], problem["b"])
     basis = find_initial_basis(problem["A"])

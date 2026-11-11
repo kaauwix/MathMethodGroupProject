@@ -13,6 +13,7 @@ class OptimalityPage(QWidget):
         self.m_cons = 2
 
         self.var_inputs = []
+        self.var_type_combos = []
         self.cons_inputs = []
         self.cons_signs = []
         self.cons_b_inputs = []
@@ -74,6 +75,7 @@ class OptimalityPage(QWidget):
                 item.widget().deleteLater()
 
         self.var_inputs.clear()
+        self.var_type_combos.clear()
         self.cons_inputs.clear()
         self.cons_signs.clear()
         self.cons_b_inputs.clear()
@@ -103,6 +105,13 @@ class OptimalityPage(QWidget):
             lbl = QLabel(f"x<sub>{i+1}</sub>")
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
+
+            type_combo = QComboBox()
+            type_combo.addItem("≥ 0", "nonneg")
+            type_combo.addItem("свободная", "free")
+            type_combo.setFixedWidth(110)
+            self.var_type_combos.append(type_combo)
+            obj_layout.addWidget(type_combo)
 
         obj_layout.addStretch()
         obj_group.setLayout(obj_layout)
@@ -205,6 +214,8 @@ class OptimalityPage(QWidget):
     def on_check(self):
         try:
             c = [float(inp.text()) for inp in self.var_inputs]
+            var_types = [combo.currentData() for combo in self.var_type_combos]
+
             A = []
             for i in range(self.m_cons):
                 row = [float(self.cons_inputs[i * self.n_vars + j].text())
@@ -221,7 +232,7 @@ class OptimalityPage(QWidget):
                     f"В плане должно быть ровно {self.n_vars} чисел."
                 )
 
-            result = check_optimality(c, A, b, x, signs)
+            result = check_optimality(c, A, b, x, signs, var_types=var_types)
 
             self.result_output.clear()
             status = result.get('status')

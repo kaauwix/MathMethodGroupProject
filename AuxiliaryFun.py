@@ -56,7 +56,7 @@ def add_table_step(steps, tableau, basis, variable_names, c, description, pivot=
 
 
 # 2. ПРОВЕРКА ИСХОДНОЙ ЗАДАЧИ
-def validate_problem(c, A, b, signs, objective="max"):
+def validate_problem(c, A, b, signs, objective="max", var_types=None):
     if not isinstance(c, (list, tuple)) or len(c) == 0:
         raise ValueError("Вектор коэффициентов целевой функции не должен быть пустым.")
     if not isinstance(A, (list, tuple)) or len(A) == 0:
@@ -72,6 +72,14 @@ def validate_problem(c, A, b, signs, objective="max"):
             raise ValueError("Все строки матрицы A должны иметь длину, равную длине c.")
     if objective not in ("max", "min"):
         raise ValueError("Цель должна быть 'max' или 'min'.")
+
+    if var_types is None:
+        var_types = ["nonneg"] * n
+    if len(var_types) != n:
+        raise ValueError("Список типов переменных должен совпадать по длине с c.")
+    for t in var_types:
+        if t not in ("nonneg", "free"):
+            raise ValueError(f"Неизвестный тип переменной: {t}")
 
     # Приводим знаки ограничений к единому виду.
     normalized_signs = []
@@ -95,37 +103,120 @@ def validate_problem(c, A, b, signs, objective="max"):
         raise ValueError("Все коэффициенты должны быть числами.")
     if not all(math.isfinite(v) for v in values):
         raise ValueError("Все коэффициенты должны быть конечными числами.")
-    return n, normalized_signs
+    return n, normalized_signs, var_types
+
+
+# ============================================================
+# 2a. РАСШИРЕНИЕ СВОБОДНЫХ ПЕРЕМЕННЫХ
+# ============================================================
+
+def expand_free_variables(c, A, var_types):
+    """
+    Заменяет свободные переменные x_j = x'_j - x''_j.
+    Возвращает:
+      new_c       — расширенный вектор c
+      new_A       — расширенная матрица A
+      mapping     — список кортежей (j_orig, kind, idx1, idx2)
+                    kind == 'nonneg' -> idx2 is None
+                    kind == 'free'   -> idx1 и idx2 — индексы x'_j и x''_j
+      var_names   — имена расширенных переменных
+    """
+    n = len(c)
+    new_c = []
+    new_cols = []       # для каждого нового столбца — исходный индекс j
+    mapping = []
+    var_names = []
+
+    for j in range(n):
+        if var_types[j] == "free":
+            idx1 = len(new_c)
+            new_c.append(c[j])
+            new_cols.append(j)
+            var_names.append(f"x{j+1}'")
+
+            new_c.append(-c[j])
+            new_cols.append(j)
+            var_names.append(f"x{j+1}''")
+
+            mapping.append((j, "free", idx1, idx1 + 1))
+        else:
+            idx1 = len(new_c)
+            new_c.append(c[j])
+            new_cols.append(j)
+            var_names.append(f"x{j+1}")
+            mapping.append((j, "nonneg", idx1, None))
+
+    new_A = []
+    for row in A:
+        new_row = [row[j] for j in new_cols]
+        # Для второго столбца свободной переменной нужен минус.
+        # Проще: пересобрать с учётом mapping.
+        new_row = []
+        for (j_orig, kind, idx1, idx2) in mapping:
+            new_row.append(row[j_orig])
+            if kind == "free":
+                new_row.append(-row[j_orig])
+        new_A.append(new_row)
+
+    return new_c, new_A, mapping, var_names
+
+
+def collapse_solution(all_values, mapping):
+    """
+    Сворачивает расширенное решение x' , x'' обратно в исходные x.
+    """
+    solution = []
+    for (j_orig, kind, idx1, idx2) in mapping:
+        if kind == "free":
+            solution.append(all_values[idx1] - all_values[idx2])
+        else:
+            solution.append(all_values[idx1])
+    return solution
 
 
 # ============================================================
 # 3. ПРИВЕДЕНИЕ ЗАДАЧИ К КАНОНИЧЕСКОМУ ВИДУ
 # ============================================================
 
-def normalize_problem(c, A, b, signs, objective="max"):
+def normalize_problem(c, A, b, signs, objective="max", var_types=None):
     """
     Подготавливает исходную задачу для симплекс-методов.
+    Сначала свободные переменные заменяются на x' - x''.
     Для <= добавляется переменная +1.
     Для >= добавляется переменная -1.
     Для = дополнительная переменная не добавляется.
     Если правая часть отрицательная, строка умножается на -1, а знак неравенства меняется на противоположный.
     Для минимизации целевая функция умножается на -1.
     """
-    n, normalized_signs = validate_problem(c, A, b, signs, objective)
+    n, normalized_signs, var_types = validate_problem(c, A, b, signs, objective, var_types)
     original_c = [float(v) for v in c]
     original_A = [[float(v) for v in row] for row in A]
     original_b = [float(v) for v in b]
+    original_var_types = var_types[:]
+
+    steps = []
+    add_text_step(steps, "Исходная задача", f"Целевая функция: {objective}. Переменных: {n}. Ограничений: {len(A)}.")
+
+    # 0. Расширяем свободные переменные.
+    exp_c, exp_A, mapping, base_names = expand_free_variables(
+        original_c, original_A, original_var_types
+    )
+    if any(kind == "free" for (_, kind, _, _) in mapping):
+        free_list = [f"x{j+1}" for (j, kind, _, _) in mapping if kind == "free"]
+        add_text_step(
+            steps, "Замена свободных переменных",
+            f"Свободные переменные {', '.join(free_list)} заменены на разность "
+            f"двух неотрицательных: x = x' - x''."
+        )
 
     # Для минимизации решаем эквивалентную задачу на максимум.
     factor = 1.0 if objective == "max" else -1.0
-    work_c = [factor * value for value in original_c]
-    work_A = [row[:] for row in original_A]
+    work_c = [factor * value for value in exp_c]
+    work_A = [row[:] for row in exp_A]
     work_b = original_b[:]
     work_signs = normalized_signs[:]
-    variable_names = [f"x{i + 1}" for i in range(n)]
-    steps = []
+    variable_names = base_names[:]
 
-    add_text_step(steps, "Исходная задача", f"Целевая функция: {objective}. Переменных: {n}. Ограничений: {len(A)}.")
     if objective == "min":
         add_text_step(steps, "Преобразование целевой функции", "Умножаем целевую функцию на -1 и решаем задачу на максимум.")
 
@@ -163,7 +254,9 @@ def normalize_problem(c, A, b, signs, objective="max"):
         "c": work_c, "A": work_A, "b": work_b, "signs": work_signs,
         "variable_names": variable_names,
         "original_c": original_c, "original_A": original_A, "original_b": original_b,
-        "original_variables_count": n,
+        "original_variables_count": len(exp_c),   # длина расширенного вектора
+        "original_var_types": original_var_types,
+        "mapping": mapping,
         "objective": objective, "objective_factor": factor,
         "steps": steps
     }

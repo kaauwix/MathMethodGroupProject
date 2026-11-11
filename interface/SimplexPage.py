@@ -15,6 +15,7 @@ class SimplexPage(QWidget):
         self.m_cons = 3
 
         self.var_inputs = []
+        self.var_type_combos = []
         self.cons_inputs = []
         self.cons_signs = []
         self.cons_b_inputs = []
@@ -88,6 +89,7 @@ class SimplexPage(QWidget):
                 item.widget().deleteLater()
 
         self.var_inputs.clear()
+        self.var_type_combos.clear()
         self.cons_inputs.clear()
         self.cons_signs.clear()
         self.cons_b_inputs.clear()
@@ -117,6 +119,14 @@ class SimplexPage(QWidget):
             lbl = QLabel(f"x<sub>{i+1}</sub>")
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
+
+            # тип переменной
+            type_combo = QComboBox()
+            type_combo.addItem("≥ 0", "nonneg")
+            type_combo.addItem("свободная", "free")
+            type_combo.setFixedWidth(110)
+            self.var_type_combos.append(type_combo)
+            obj_layout.addWidget(type_combo)
 
         obj_layout.addStretch()
         obj_group.setLayout(obj_layout)
@@ -234,6 +244,7 @@ class SimplexPage(QWidget):
         try:
             c = [float(inp.text()) for inp in self.var_inputs]
             objective = self.obj_combo.currentText()
+            var_types = [combo.currentData() for combo in self.var_type_combos]
 
             A = []
             for i in range(self.m_cons):
@@ -246,7 +257,8 @@ class SimplexPage(QWidget):
 
             result = solve_problem(
                 c, A, b, signs, objective,
-                force_method=force_method
+                force_method=force_method,
+                var_types=var_types
             )
 
             # --- Специальный случай: доступен двойственный (и/или МИБ) ---

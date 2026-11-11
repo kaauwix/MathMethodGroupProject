@@ -1,5 +1,8 @@
 #Метод искусственного базиса
-from AuxiliaryFun import add_text_step, add_table_step, find_initial_basis, calculate_deltas, pivot_operation, build_tableau, make_result, EPSILON
+from AuxiliaryFun import (
+    add_text_step, add_table_step, find_initial_basis, calculate_deltas,
+    pivot_operation, build_tableau, make_result, EPSILON
+)
 
 def artificial_basis_prepared(problem, max_iterations=1000):
     steps = problem["steps"]
