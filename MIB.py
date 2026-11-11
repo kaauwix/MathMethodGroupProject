@@ -18,7 +18,7 @@ def artificial_basis_prepared(problem, max_iterations=1000):
     work_b = problem["b"][:]
     variable_names = problem["variable_names"][:]
 
-    # 2. Проверка: вдруг базис уже есть
+    # 1. Проверка на базис
     basis = find_initial_basis(work_A)
     if basis is not None:
         add_text_step(
@@ -31,17 +31,15 @@ def artificial_basis_prepared(problem, max_iterations=1000):
             steps, problem=problem
         )
 
-    # 3. Добавление искусственных переменных
+    # 2. Добавляем искусственные переменные
     n = len(work_c)
     m = len(work_A)
     artificial_indices = []
 
     for i in range(m):
-        # Проверяем, есть ли в строке i единичный столбец
         has_unit = False
         for j in range(len(work_A[i])):
             if abs(work_A[i][j] - 1.0) <= EPSILON:
-                # проверяем, что в остальных строках этой колонки нули
                 if all(abs(work_A[k][j]) <= EPSILON for k in range(m) if k != i):
                     has_unit = True
                     break
@@ -53,7 +51,7 @@ def artificial_basis_prepared(problem, max_iterations=1000):
             variable_names.append(f"w{len(artificial_indices) + 1}")
             artificial_indices.append(len(variable_names) - 1)
 
-    # 4. Вспомогательная целевая функция F = -sum(w)
+    # 3. Вспомогательная целевая функция F
     c_art = [0.0] * len(work_c)
     for idx in artificial_indices:
         c_art[idx] = -1.0
@@ -69,13 +67,13 @@ def artificial_basis_prepared(problem, max_iterations=1000):
     add_table_step(steps, tableau, basis, variable_names, c_art,
                    "Начальная таблица вспомогательной задачи")
 
-    # 5. Итерации вспомогательной задачи
+    # 4. Итерации вспомогательной задачи
     for iteration in range(1, max_iterations + 1):
         deltas = calculate_deltas(tableau, c_art, basis)
         negative = [j for j, d in enumerate(deltas) if d < -EPSILON and j not in basis]
 
         if not negative:
-            break  # вспомогательная задача решена
+            break 
 
         pivot_col = min(negative, key=lambda j: deltas[j])
         ratios = []
@@ -110,7 +108,7 @@ def artificial_basis_prepared(problem, max_iterations=1000):
                        f"Таблица вспомогательной задачи после итерации {iteration}",
                        pivot=pivot_info)
 
-    # 6. Анализ результата
+    # 5. Анализ результата
     F_value = sum(c_art[j] * tableau[i][-1] for i, j in enumerate(basis))
     add_text_step(steps, "Результат вспомогательной задачи",
                   f"max F = {F_value}.")
@@ -123,14 +121,12 @@ def artificial_basis_prepared(problem, max_iterations=1000):
                            deltas=calculate_deltas(tableau, c_art, basis),
                            problem=problem)
 
-    # 7. Вывод искусственных переменных из базиса
-    # Если искусственная переменная осталась в базисе, выводим её
+    # 6. Вывод искусственных переменных из базиса
     changed = True
     while changed:
         changed = False
         for i, basic_idx in enumerate(basis):
             if basic_idx in artificial_indices:
-                # Ищем ненулевой элемент в строке i среди x-столбцов (не искусственных)
                 candidate = None
                 for j in range(len(work_c)):
                     if j not in artificial_indices and abs(tableau[i][j]) > EPSILON:
@@ -138,7 +134,6 @@ def artificial_basis_prepared(problem, max_iterations=1000):
                         break
                 
                 if candidate is not None:
-                    # Делаем жорданово преобразование, чтобы вывести w
                     pivot_info = {
                         "row": i, "column": candidate,
                         "value": tableau[i][candidate],
@@ -157,7 +152,6 @@ def artificial_basis_prepared(problem, max_iterations=1000):
                     changed = True
                     break
                 else:
-                    # Если строка нулевая, просто удаляем её из таблицы
                     add_text_step(
                         steps, "Удаление лишней строки",
                         f"Строка с {variable_names[basic_idx]} содержит только нули при x_j. Удаляем её."
@@ -167,34 +161,27 @@ def artificial_basis_prepared(problem, max_iterations=1000):
                     changed = True
                     break
 
-    # 8. Убираем все оставшиеся искусственные столбцы
-    # Делаем это один раз в конце, чтобы не путаться с индексами
+    # 7. Убираем все оставшиеся искусственные столбцы
     if artificial_indices:
-        # Удаляем столбцы в обратном порядке (с конца), чтобы индексы не съезжали
         for idx in sorted(artificial_indices, reverse=True):
             for row in tableau:
                 row.pop(idx)
             variable_names.pop(idx)
             work_c.pop(idx)
-        # Обнуляем список искусственных индексов, так как мы их удалили
         artificial_indices = []
 
-    # 9. Пересчёт оценок по исходной целевой функции
-    # Восстанавливаем c для x-переменных (исходные + дополнительные)
+    # 8. Пересчёт оценок по исходной целевой функции
     c_original = problem["c"][:]
-    # Если после удаления строк длина c_original не совпадает - дополняем нулями
     while len(c_original) < len(work_c):
         c_original.append(0.0)
     c_original = c_original[:len(work_c)]
 
-    # Пересчитываем таблицу под новый базис (если строки удалялись - уже готово)
     add_text_step(steps, "Переход к исходной задаче",
                   "Искусственные переменные выведены. Дальше решаем прямой симплекс-метод.")
     add_table_step(steps, tableau, basis, variable_names, c_original,
                    "Начальная таблица исходной задачи")
 
-    # 10. Запуск прямого симплекс-метода
-    # На этом этапе искусственные переменные уже удалены, а допустимый базис сформирован
+    # 9. Запуск прямого симплекс-метода
     from PrimalSimplex import primal_simplex_prepared
 
     return primal_simplex_prepared(problem, tableau, basis, max_iterations)

@@ -5,15 +5,13 @@ from AuxiliaryFun import EPSILON
 
 def check_optimality(c, A, b, x, signs, tolerance=1e-7):
     """
-    Проверяет план x на оптимальность по 2-й теореме двойственности.
+    Проверяет план x на оптимальность.
     Работает для задач вида: f=(c,x)->max, A x <= b, x >= 0.
-    signs: список знаков ограничений ('<=', '>=', '=')
     Возвращает: dict(status, message, y=None или найденное y, details)
     """
     n = len(c)
     m = len(A)
 
-    # Приводим все ограничения к виду <=
     A_norm = [row[:] for row in A]
     b_norm = b[:]
     for i, sign in enumerate(signs):
@@ -21,7 +19,6 @@ def check_optimality(c, A, b, x, signs, tolerance=1e-7):
             A_norm[i] = [-v for v in A_norm[i]]
             b_norm[i] = -b_norm[i]
         elif sign == "=":
-            # Равенство: разбиваем на два неравенства (a_i,x)<=b_i и -(a_i,x)<=-b_i
             A_norm.append([-v for v in A_norm[i]])
             b_norm.append(-b_norm[i])
 
