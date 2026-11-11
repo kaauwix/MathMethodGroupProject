@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QGroupBox, QComboBox, QScrollArea,
-    QFrame, QSpinBox, QTabWidget
+    QPushButton, QTextEdit, QGroupBox, QComboBox, QSpinBox,
+    QTabWidget
 )
 from PyQt5.QtCore import Qt
 from SolveLP import solve_primal_and_dual
@@ -20,6 +20,7 @@ class DualPage(QWidget):
         self.cons_b_inputs = []
 
         self.init_ui()
+        self.load_example()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -43,22 +44,17 @@ class DualPage(QWidget):
         self.m_cons_spin.setValue(self.m_cons)
         self.m_cons_spin.valueChanged.connect(self.rebuild_ui)
         size_layout.addWidget(self.m_cons_spin)
+        size_layout.addStretch()
 
         size_group.setLayout(size_layout)
         main_layout.addWidget(size_group)
 
-        # --- Прокрутка ввода ---
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-
+        # --- Контейнер ввода (без QScrollArea) ---
         self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)
         self.scroll_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll_layout.setSpacing(15)
-
-        scroll.setWidget(self.scroll_content)
-        main_layout.addWidget(scroll, 1)
+        main_layout.addWidget(self.scroll_content, 1)
 
         # --- Вкладки результата ---
         self.results_tabs = QTabWidget()
@@ -178,6 +174,35 @@ class DualPage(QWidget):
         solve_btn.clicked.connect(self.on_solve)
         self.scroll_layout.addWidget(solve_btn)
         self.scroll_layout.addStretch()
+
+    # ------------------------------------------------------------------
+    def load_example(self):
+        self.n_vars_spin.setValue(2)
+        self.m_cons_spin.setValue(2)
+        self.rebuild_ui()
+
+        self.obj_combo.setCurrentText("max")
+        self.var_inputs[0].setText("3")
+        self.var_inputs[1].setText("2")
+
+        constraints = [
+            ([1.0, 1.0], "<=", 4.0),
+            ([2.0, 1.0], "<=", 6.0),
+        ]
+
+        for i, (coeffs, sign, rhs) in enumerate(constraints):
+            for j in range(self.n_vars):
+                self.cons_inputs[i * self.n_vars + j].setText(
+                    self._fmt(coeffs[j])
+                )
+            self.cons_signs[i].setCurrentText(sign)
+            self.cons_b_inputs[i].setText(self._fmt(rhs))
+
+    @staticmethod
+    def _fmt(v):
+        if float(v).is_integer():
+            return str(int(v))
+        return str(v)
 
     # ------------------------------------------------------------------
     def on_solve(self):

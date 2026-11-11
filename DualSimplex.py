@@ -1,13 +1,14 @@
 #Двойственный симплекс
 from AuxiliaryFun import add_text_step, add_table_step, calculate_deltas, pivot_operation, recover_solution, make_result, EPSILON
 
-def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000):
+def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000, force=False):
     """
     Решает уже подготовленную задачу двойственным симплекс-методом.
     problem — нормализованная задача;
     tableau — начальная симплексная таблица;
     basis — начальный базис;
     max_iterations — максимальное количество итераций.
+    force — если True, игнорирует требование Δ >= 0 (для принудительного запуска).
     """
     c = problem["c"]
     names = problem["variable_names"]
@@ -21,7 +22,7 @@ def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000):
     # Проверяем условия применения двойственного метода.
     deltas = calculate_deltas(tableau, c, basis)
 
-    if any(delta < -EPSILON for delta in deltas):
+    if not force and any(delta < -EPSILON for delta in deltas):
         message = "Есть отрицательные оценки Delta_j. Двойственный симплекс-метод применить нельзя."
         add_text_step(steps, "Проверка условий метода", message)
         return make_result("dual_simplex_not_applicable", message, steps, tableau=tableau, basis=basis, deltas=deltas, problem=problem)
@@ -114,12 +115,13 @@ def dual_simplex_prepared(problem, tableau, basis, max_iterations=1000):
         # 9. Сохраняем новую таблицу.
         add_table_step(steps, tableau, basis, names, c, f"Таблица после итерации {iteration}", pivot_info)
 
-        # 10. Проверяем сохранение двойственной допустимости.
-        deltas = calculate_deltas(tableau, c, basis)
-        if any(delta < -EPSILON for delta in deltas):
-            message = "После преобразования появились отрицательные оценки. Условие двойственной допустимости нарушено."
-            add_text_step(steps, "Проверка двойственной допустимости", message)
-            return make_result("dual_feasibility_lost", message, steps, tableau=tableau, basis=basis, deltas=deltas, problem=problem)
+        # 10. Проверяем сохранение двойственной допустимости (только если не force).
+        if not force:
+            deltas = calculate_deltas(tableau, c, basis)
+            if any(delta < -EPSILON for delta in deltas):
+                message = "После преобразования появились отрицательные оценки. Условие двойственной допустимости нарушено."
+                add_text_step(steps, "Проверка двойственной допустимости", message)
+                return make_result("dual_feasibility_lost", message, steps, tableau=tableau, basis=basis, deltas=deltas, problem=problem)
 
     # ПРЕВЫШЕНО КОЛИЧЕСТВО ИТЕРАЦИЙ
     message = "Превышено максимальное количество итераций."

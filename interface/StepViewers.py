@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem,
-    QHeaderView, QFrame, QScrollArea
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
+    QTableWidgetItem, QHeaderView, QFrame, QScrollArea, QSizePolicy
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
@@ -13,6 +13,7 @@ class StepsViewer(QScrollArea):
         super().__init__()
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         self.container = QWidget()
         self.layout = QVBoxLayout(self.container)
@@ -31,7 +32,7 @@ class StepsViewer(QScrollArea):
         self.clear()
         lbl = QLabel(text)
         lbl.setWordWrap(True)
-        lbl.setStyleSheet("color: #947783; font-size: 15px; padding: 8px;")
+        lbl.setStyleSheet("color: #947783; font-size: 22px; padding: 8px;")
         self.layout.addWidget(lbl)
         self.layout.addStretch()
 
@@ -55,24 +56,24 @@ class StepsViewer(QScrollArea):
         box = QFrame()
         box.setObjectName("card")
         v = QVBoxLayout(box)
-        v.setContentsMargins(12, 10, 12, 10)
-        v.setSpacing(6)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(10)
 
         title = QLabel(f"<b>{step['title']}</b>")
-        title.setStyleSheet("color: #CB6892; font-size: 17px;")
+        title.setStyleSheet("color: #CB6892; font-size: 26px;")
         title.setWordWrap(True)
         v.addWidget(title)
 
         desc = QLabel(step.get("description", ""))
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #49333D; font-size: 15px;")
+        desc.setStyleSheet("color: #49333D; font-size: 22px;")
         v.addWidget(desc)
 
         data = step.get("data")
         if data:
             extra = QLabel(self._format_data(data))
             extra.setWordWrap(True)
-            extra.setStyleSheet("color: #947783; font-size: 14px;")
+            extra.setStyleSheet("color: #947783; font-size: 20px;")
             v.addWidget(extra)
 
         self.layout.addWidget(box)
@@ -82,16 +83,23 @@ class StepsViewer(QScrollArea):
         box = QFrame()
         box.setObjectName("card")
         v = QVBoxLayout(box)
-        v.setContentsMargins(12, 10, 12, 10)
-        v.setSpacing(8)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(12)
 
         title = QLabel(f"<b>{step['title']}</b>")
-        title.setStyleSheet("color: #CB6892; font-size: 17px;")
+        title.setStyleSheet("color: #CB6892; font-size: 26px;")
         title.setWordWrap(True)
         v.addWidget(title)
 
         table = self._build_table(step)
-        v.addWidget(table)
+        
+        # Оборачиваем таблицу в HBox, чтобы она прижималась влево и не растягивалась
+        h_layout = QHBoxLayout()
+        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.addWidget(table)
+        h_layout.addStretch() 
+        
+        v.addLayout(h_layout)
 
         pivot = step.get("pivot")
         if pivot:
@@ -103,7 +111,7 @@ class StepsViewer(QScrollArea):
             )
             lbl = QLabel(pivot_text)
             lbl.setWordWrap(True)
-            lbl.setStyleSheet("color: #947783; font-size: 14px;")
+            lbl.setStyleSheet("color: #947783; font-size: 20px;")
             v.addWidget(lbl)
 
         self.layout.addWidget(box)
@@ -115,45 +123,62 @@ class StepsViewer(QScrollArea):
         basis = step["basis"]
         cb = step["cb"]
         deltas = step["deltas"]
-        c_full = step.get("c", [0.0] * len(names))   # полный вектор c_j
+        c_full = step.get("c", [0.0] * len(names))
         pivot = step.get("pivot")
 
-        # --- Скрываем столбцы s1, s2, ... (доп. переменные) ---
-        # Оставляем только x1..xn. Если решите вернуть s — просто
-        # замените условие ниже на `return True`.
         show_idx = [j for j, name in enumerate(names) if name.startswith("x")]
         n_show = len(show_idx)
 
         rows = len(tableau)
-
-        # --- Колонки: C_b | Базис | x1..xn | b ---
+        total_rows = rows + 2
         cols = 2 + n_show + 1
-        table = QTableWidget(rows + 2, cols)   # + c_j + Δ_j
-        table.setEditTriggers(QTableWidget.NoEditTriggers)
-        table.setAlternatingRowColors(True)
-        table.setFont(QFont("Arial", 12))
 
+        # Вычисляем текущее значение целевой функции Z = sum(C_b * b)
+        z_value = sum(cb[i] * tableau[i][-1] for i in range(rows))
+
+        table = QTableWidget(total_rows, cols)
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setAlternatingRowColors(False)
+        
+        # --- Шрифт: крупный, 28pt ---
+        font = QFont("Arial", 28)
+        font.setBold(True)
+        table.setFont(font)
+        table.setStyleSheet("QTableWidget { color: #49333D; border: none; }")
+
+        # --- Гарантированно убираем скроллы ---
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        table.verticalHeader().setVisible(False)
+
+        # --- Заголовки ---
         headers = ["C_b", "Базис"] + [names[j] for j in show_idx] + ["b"]
         table.setHorizontalHeaderLabels(headers)
-
-        vheaders = [f"A{i + 1}" for i in range(rows)] + ["c_j", "Δ_j"]
-        table.setVerticalHeaderLabels(vheaders)
+        
+        table.horizontalHeader().setStyleSheet("""
+            QHeaderView::section {
+                background-color: #F4D6E3;
+                color: #CB6892;
+                font-weight: bold;
+                font-size: 28px;
+                padding: 12px;
+                border: 1px solid #EBC6D7;
+            }
+        """)
 
         # --- Строки базиса ---
         for i in range(rows):
-            # C_b
             item = QTableWidgetItem(self._fmt(cb[i]))
             item.setTextAlignment(Qt.AlignCenter)
             item.setBackground(QColor("#F4D6E3"))
             table.setItem(i, 0, item)
 
-            # Базис
             item = QTableWidgetItem(names[basis[i]])
             item.setTextAlignment(Qt.AlignCenter)
             item.setBackground(QColor("#F4D6E3"))
             table.setItem(i, 1, item)
 
-            # Коэффициенты (только для show_idx)
             for c_pos, j in enumerate(show_idx):
                 item = QTableWidgetItem(self._fmt(tableau[i][j]))
                 item.setTextAlignment(Qt.AlignCenter)
@@ -161,7 +186,6 @@ class StepsViewer(QScrollArea):
                     item.setBackground(QColor("#F8D5E4"))
                 table.setItem(i, 2 + c_pos, item)
 
-            # b
             item = QTableWidgetItem(self._fmt(tableau[i][-1]))
             item.setTextAlignment(Qt.AlignCenter)
             if pivot and i == pivot["row"]:
@@ -173,20 +197,35 @@ class StepsViewer(QScrollArea):
         item = QTableWidgetItem("c_j")
         item.setTextAlignment(Qt.AlignCenter)
         item.setBackground(QColor("#EBC6D7"))
+        item.setForeground(QColor("#CB6892"))
         table.setItem(r, 1, item)
+        
+        item_empty_c = QTableWidgetItem("")
+        item_empty_c.setBackground(QColor("#EBC6D7"))
+        table.setItem(r, 0, item_empty_c)
 
         for c_pos, j in enumerate(show_idx):
             item = QTableWidgetItem(self._fmt(c_full[j]))
             item.setTextAlignment(Qt.AlignCenter)
             item.setBackground(QColor("#EBC6D7"))
             table.setItem(r, 2 + c_pos, item)
+            
+        # Пустая ячейка под b в строке c_j
+        item_b_c = QTableWidgetItem("")
+        item_b_c.setBackground(QColor("#EBC6D7"))
+        table.setItem(r, 2 + n_show, item_b_c)
 
         # --- Строка Δ_j ---
         r = rows + 1
         item = QTableWidgetItem("Δ_j")
         item.setTextAlignment(Qt.AlignCenter)
         item.setBackground(QColor("#EBC6D7"))
+        item.setForeground(QColor("#CB6892"))
         table.setItem(r, 1, item)
+        
+        item_empty_d = QTableWidgetItem("")
+        item_empty_d.setBackground(QColor("#EBC6D7"))
+        table.setItem(r, 0, item_empty_d)
 
         for c_pos, j in enumerate(show_idx):
             item = QTableWidgetItem(self._fmt(deltas[j]))
@@ -194,9 +233,29 @@ class StepsViewer(QScrollArea):
             item.setBackground(QColor("#EBC6D7"))
             table.setItem(r, 2 + c_pos, item)
 
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        table.setMinimumHeight(32 * (rows + 2) + 8)
+        # --- ВЫВОДИМ f = ... ПОД СТОЛБЦОМ b ---
+        item_z = QTableWidgetItem(f"f = {self._fmt(z_value)}")
+        item_z.setTextAlignment(Qt.AlignCenter)
+        item_z.setBackground(QColor("#EBC6D7"))
+        item_z.setForeground(QColor("#49333D"))
+        table.setItem(r, 2 + n_show, item_z)
+
+        # --- Размеры: увеличены под 28pt ---
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        
+        for c in range(cols):
+            table.setColumnWidth(c, 150)        # было 105
+        for r in range(total_rows):
+            table.setRowHeight(r, 78)           # было 52
+
+        # --- Вычисляем итоговый размер и задаем его ---
+        header_h = table.horizontalHeader().height()
+        total_h = sum(table.rowHeight(i) for i in range(total_rows))
+        total_w = sum(table.columnWidth(c) for c in range(cols))
+
+        table.setFixedHeight(header_h + total_h + 2)
+        table.setFixedWidth(total_w + 2)
 
         return table
 

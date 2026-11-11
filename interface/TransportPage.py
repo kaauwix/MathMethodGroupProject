@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 from TransportSolver import solve_transport
 
+
 class TransportPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -14,6 +15,7 @@ class TransportPage(QWidget):
         self.n = 2 
         self.current_res = None 
         self.init_ui()
+        self.load_example()
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -126,6 +128,34 @@ class TransportPage(QWidget):
 
         self.rebuild_input_table()
 
+    # ------------------------------------------------------------------
+    def load_example(self):
+        self.spin_m.setValue(2)
+        self.spin_n.setValue(2)
+        self.rebuild_input_table()
+
+        costs = [
+            [4.0, 1.0],
+            [2.0, 3.0],
+        ]
+        a = [30.0, 20.0]
+        b = [20.0, 30.0]
+
+        for i in range(self.m):
+            for j in range(self.n):
+                self.input_table.item(i, j).setText(self._fmt(costs[i][j]))
+            self.input_table.item(i, self.n).setText(self._fmt(a[i]))
+
+        for j in range(self.n):
+            self.input_table.item(self.m, j).setText(self._fmt(b[j]))
+
+    @staticmethod
+    def _fmt(v):
+        if float(v).is_integer():
+            return str(int(v))
+        return str(v)
+
+    # ------------------------------------------------------------------
     def toggle_info_visibility(self):
         self.info_text.setVisible(not self.info_text.isVisible())
 
