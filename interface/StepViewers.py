@@ -93,7 +93,6 @@ class StepsViewer(QScrollArea):
 
         table = self._build_table(step)
         
-        # Оборачиваем таблицу в HBox, чтобы она прижималась влево и не растягивалась
         h_layout = QHBoxLayout()
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.addWidget(table)
@@ -126,7 +125,9 @@ class StepsViewer(QScrollArea):
         c_full = step.get("c", [0.0] * len(names))
         pivot = step.get("pivot")
 
-        show_idx = [j for j, name in enumerate(names) if name.startswith("x")]
+        # Формируем список столбцов для отображения:
+        # Исключаем базисные столбцы (они уже есть в колонке "Базис")
+        show_idx = [j for j in range(len(names)) if j not in basis]
         n_show = len(show_idx)
 
         rows = len(tableau)
@@ -140,19 +141,18 @@ class StepsViewer(QScrollArea):
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setAlternatingRowColors(False)
         
-        # --- Шрифт: крупный, 28pt ---
+        # Шрифт
         font = QFont("Arial", 28)
         font.setBold(True)
         table.setFont(font)
         table.setStyleSheet("QTableWidget { color: #49333D; border: none; }")
 
-        # --- Гарантированно убираем скроллы ---
+        # Убираем скроллы
         table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        
         table.verticalHeader().setVisible(False)
 
-        # --- Заголовки ---
+        # Заголовки
         headers = ["C_b", "Базис"] + [names[j] for j in show_idx] + ["b"]
         table.setHorizontalHeaderLabels(headers)
         
@@ -167,7 +167,7 @@ class StepsViewer(QScrollArea):
             }
         """)
 
-        # --- Строки базиса ---
+        # Строки базиса
         for i in range(rows):
             item = QTableWidgetItem(self._fmt(cb[i]))
             item.setTextAlignment(Qt.AlignCenter)
@@ -182,17 +182,19 @@ class StepsViewer(QScrollArea):
             for c_pos, j in enumerate(show_idx):
                 item = QTableWidgetItem(self._fmt(tableau[i][j]))
                 item.setTextAlignment(Qt.AlignCenter)
+                # Подсветка ведущего столбца
                 if pivot and j == pivot["column"]:
                     item.setBackground(QColor("#F8D5E4"))
                 table.setItem(i, 2 + c_pos, item)
 
             item = QTableWidgetItem(self._fmt(tableau[i][-1]))
             item.setTextAlignment(Qt.AlignCenter)
+            # Подсветка ведущей строки
             if pivot and i == pivot["row"]:
                 item.setBackground(QColor("#F8D5E4"))
             table.setItem(i, 2 + n_show, item)
 
-        # --- Строка c_j ---
+        # Строка c_j
         r = rows
         item = QTableWidgetItem("c_j")
         item.setTextAlignment(Qt.AlignCenter)
@@ -210,12 +212,11 @@ class StepsViewer(QScrollArea):
             item.setBackground(QColor("#EBC6D7"))
             table.setItem(r, 2 + c_pos, item)
             
-        # Пустая ячейка под b в строке c_j
         item_b_c = QTableWidgetItem("")
         item_b_c.setBackground(QColor("#EBC6D7"))
         table.setItem(r, 2 + n_show, item_b_c)
 
-        # --- Строка Δ_j ---
+        # Строка Δ_j
         r = rows + 1
         item = QTableWidgetItem("Δ_j")
         item.setTextAlignment(Qt.AlignCenter)
@@ -233,23 +234,23 @@ class StepsViewer(QScrollArea):
             item.setBackground(QColor("#EBC6D7"))
             table.setItem(r, 2 + c_pos, item)
 
-        # --- ВЫВОДИМ f = ... ПОД СТОЛБЦОМ b ---
+        # Вывод f = ...
         item_z = QTableWidgetItem(f"f = {self._fmt(z_value)}")
         item_z.setTextAlignment(Qt.AlignCenter)
         item_z.setBackground(QColor("#EBC6D7"))
         item_z.setForeground(QColor("#49333D"))
         table.setItem(r, 2 + n_show, item_z)
 
-        # --- Размеры: увеличены под 28pt ---
+        # Размеры
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
         
         for c in range(cols):
-            table.setColumnWidth(c, 150)        # было 105
+            table.setColumnWidth(c, 150)
         for r in range(total_rows):
-            table.setRowHeight(r, 78)           # было 52
+            table.setRowHeight(r, 78)
 
-        # --- Вычисляем итоговый размер и задаем его ---
+        # Итоговый размер
         header_h = table.horizontalHeader().height()
         total_h = sum(table.rowHeight(i) for i in range(total_rows))
         total_w = sum(table.columnWidth(c) for c in range(cols))

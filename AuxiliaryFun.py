@@ -106,10 +106,7 @@ def validate_problem(c, A, b, signs, objective="max", var_types=None):
     return n, normalized_signs, var_types
 
 
-# ============================================================
 # 2a. РАСШИРЕНИЕ СВОБОДНЫХ ПЕРЕМЕННЫХ
-# ============================================================
-
 def expand_free_variables(c, A, var_types):
     """
     Заменяет свободные переменные x_j = x'_j - x''_j.
@@ -198,9 +195,7 @@ def normalize_problem(c, A, b, signs, objective="max", var_types=None):
     add_text_step(steps, "Исходная задача", f"Целевая функция: {objective}. Переменных: {n}. Ограничений: {len(A)}.")
 
     # 0. Расширяем свободные переменные.
-    exp_c, exp_A, mapping, base_names = expand_free_variables(
-        original_c, original_A, original_var_types
-    )
+    exp_c, exp_A, mapping, base_names = expand_free_variables(original_c, original_A, original_var_types)
     if any(kind == "free" for (_, kind, _, _) in mapping):
         free_list = [f"x{j+1}" for (j, kind, _, _) in mapping if kind == "free"]
         add_text_step(
@@ -343,44 +338,52 @@ def determine_method(tableau, c, basis):
 
 
 
-# 6. ПЕРЕСЧЁТ СИМПЛЕКСНОЙ ТАБЛИЦЫ
 def pivot_operation(tableau, pivot_row, pivot_column):
     """
-    Выполняет пересчёт симплексной таблицы.
-    p — ведущий элемент.
-    1. Ведущую строку делим на p.
-    2. В остальных строках обнуляем ведущий столбец.
-    Формулы:
-    Новая ведущая строка: a'[r,j] = a[r,j] / p
-    Остальные строки: a'[i,j] = a[i,j] - a[i,q] * a[r,j] / p
-    Ведущий элемент становится равным 1, остальные элементы ведущего столбца становятся 0.
+    Жорданово преобразование симплекс-таблицы (нормировка с инверсией):
+      1. Ведущий элемент заменяется на 1/p (инверсия).
+      2. Ведущая строка делится на p  (кроме ведущего элемента).
+      3. Ведущий столбец делится на -p (кроме ведущего элемента).
+      4. Остальные элементы — по правилу прямоугольника: a'[i][j] = a[i][j] - a[i][s]*a[r][j]/p
     """
-    pivot = tableau[pivot_row][pivot_column]
-    if abs(pivot) <= EPSILON:
+    p = tableau[pivot_row][pivot_column]
+    if abs(p) <= EPSILON:
         raise ZeroDivisionError("Ведущий элемент равен нулю.")
-    
-    old_tableau = [row[:] for row in tableau]
-    row_count = len(old_tableau)
-    column_count = len(old_tableau[0])
-    new_tableau = []
 
-    for i in range(row_count):
-        new_row = []
-        for j in range(column_count):
-            if i == pivot_row:
-                # Делим элементы ведущей строки на p.
-                value = old_tableau[i][j] / pivot
-            else:
-                # Обнуляем элементы ведущего столбца.
-                value = (old_tableau[i][j] * pivot - old_tableau[i][pivot_column] * old_tableau[pivot_row][j]) / pivot
-            # Убираем погрешности вычислений.
-            if abs(value) <= EPSILON:
-                value = 0.0
-            new_row.append(value)
-        new_tableau.append(new_row)
+    rows = len(tableau)
+    cols = len(tableau[0])
 
-    # Обновляем исходную таблицу.
-    tableau[:] = new_tableau
+    old = [row[:] for row in tableau]   # снимок ДО преобразования
+
+    #Инверсия ведущего элемента
+    tableau[pivot_row][pivot_column] = 1.0 / p
+
+    # Ведущая строка делится на p
+    for j in range(cols):
+        if j == pivot_column:
+            continue
+        tableau[pivot_row][j] = old[pivot_row][j] / p
+
+    # Ведущий столбец делится на -p
+    for i in range(rows):
+        if i == pivot_row:
+            continue
+        tableau[i][pivot_column] = -old[i][pivot_column] / p
+
+    # остальные элементы
+    for i in range(rows):
+        if i == pivot_row:
+            continue
+        for j in range(cols):
+            if j == pivot_column:
+                continue
+            tableau[i][j] = old[i][j] - old[i][pivot_column] * old[pivot_row][j] / p
+
+    # Чистим численный мусор
+    for i in range(rows):
+        for j in range(cols):
+            if abs(tableau[i][j]) <= EPSILON:
+                tableau[i][j] = 0.0
 
 
 # 7. ПОСТРОЕНИЕ СИМПЛЕКСНОЙ ТАБЛИЦЫ
@@ -392,17 +395,15 @@ def build_tableau(A, b):
 
 # 8. ВОССТАНОВЛЕНИЕ РЕШЕНИЯ
 def recover_solution(tableau, basis, variable_count):
-    """
-    Восстанавливает значения исходных переменных.
-    Небазисные переменные равны нулю.
-    Значения базисных переменных берутся из столбца b.
-    """
     solution = [0.0] * variable_count
     for i, column in enumerate(basis):
         if column < variable_count:
-            solution[column] = tableau[i][-1]
+            coeff = tableau[i][column] # это 1/p
+            if abs(coeff) > EPSILON:
+                solution[column] = tableau[i][-1] / coeff
+            else:
+                solution[column] = tableau[i][-1]
     return solution
-
 
 # 9. ФОРМИРОВАНИЕ ОБЩЕГО РЕЗУЛЬТАТА
 def make_result(status, message, steps, solution=None, objective_value=None, tableau=None, basis=None, deltas=None, problem=None, **extra):
