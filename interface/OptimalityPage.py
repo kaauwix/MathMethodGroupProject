@@ -48,7 +48,7 @@ class OptimalityPage(QWidget):
         main_layout.addWidget(size_group)
 
         # ==========================================
-        # БЛОК 2: ПРОКРУЧИВАЕМАЯ ОБЛАСТЬ ДЛЯ ВВОДА
+        # БЛОК 2: ПРОКРУЧИВАЕМАЯ ОБЛАСТЬ
         # ==========================================
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -67,14 +67,13 @@ class OptimalityPage(QWidget):
         # ==========================================
         self.result_output = QTextEdit()
         self.result_output.setReadOnly(True)
-        self.result_output.setMaximumHeight(200)
+        self.result_output.setMaximumHeight(250)
         main_layout.addWidget(QLabel("<b>Результат проверки:</b>"))
         main_layout.addWidget(self.result_output)
 
         self.rebuild_ui()
 
     def rebuild_ui(self):
-        """Перерисовывает поля ввода при изменении размерности"""
         self.n_vars = self.n_vars_spin.value()
         self.m_cons = self.m_cons_spin.value()
 
@@ -88,7 +87,7 @@ class OptimalityPage(QWidget):
         self.cons_signs.clear()
         self.cons_b_inputs.clear()
 
-        # --- Блок целевой функции ---
+        # --- Целевая функция ---
         obj_group = QGroupBox("Целевая функция")
         obj_layout = QHBoxLayout()
         obj_layout.setAlignment(Qt.AlignLeft)
@@ -118,7 +117,7 @@ class OptimalityPage(QWidget):
         obj_group.setLayout(obj_layout)
         self.scroll_layout.addWidget(obj_group)
 
-        # --- Блок ограничений ---
+        # --- Ограничения ---
         cons_group = QGroupBox("Ограничения")
         cons_layout = QVBoxLayout()
 
@@ -160,10 +159,9 @@ class OptimalityPage(QWidget):
         cons_group.setLayout(cons_layout)
         self.scroll_layout.addWidget(cons_group)
 
-        # --- Блок ввода проверяемого плана ---
+        # --- Проверяемый план ---
         plan_group = QGroupBox("Проверяемый план x")
         plan_layout = QHBoxLayout()
-        
         self.plan_input = QLineEdit()
         self.plan_input.setPlaceholderText("Например: 2, 2 (через запятую)")
         plan_layout.addWidget(QLabel("Значения переменных:"))
@@ -171,7 +169,7 @@ class OptimalityPage(QWidget):
         plan_group.setLayout(plan_layout)
         self.scroll_layout.addWidget(plan_group)
 
-        # Кнопка "Проверить"
+        # Кнопка
         check_btn = QPushButton("ПРОВЕРИТЬ ПЛАН")
         check_btn.setObjectName("solveButton")
         check_btn.setMinimumHeight(50)
@@ -181,7 +179,7 @@ class OptimalityPage(QWidget):
 
     def on_check(self):
         try:
-            # 1. Сборка целевой функции и ограничений (аналогично SimplexPage)
+            # Сборка задачи
             c = [float(inp.text()) for inp in self.var_inputs]
             A = []
             for i in range(self.m_cons):
@@ -190,17 +188,17 @@ class OptimalityPage(QWidget):
             b = [float(inp.text()) for inp in self.cons_b_inputs]
             signs = [combo.currentText() for combo in self.cons_signs]
 
-            # 2. Сборка проверяемого плана x
-            plan_text = self.plan_input.text().replace(' ', '') # убираем пробелы
+            # Сборка плана x
+            plan_text = self.plan_input.text().replace(' ', '')
             x = [float(val) for val in plan_text.split(',')]
 
             if len(x) != self.n_vars:
                 raise ValueError(f"В плане должно быть ровно {self.n_vars} чисел.")
 
-            # 3. Вызов функции проверки
+            # Вызов
             result = check_optimality(c, A, b, x, signs)
 
-            # 4. Вывод результата
+            # Вывод
             self.result_output.clear()
             status = result.get('status')
             
@@ -214,7 +212,8 @@ class OptimalityPage(QWidget):
             self.result_output.append(f"<b>Сообщение:</b> {result.get('message')}")
             
             if result.get('y') is not None:
-                self.result_output.append(f"<b>Двойственные оценки (y):</b> {result['y']}")
+                y_str = ", ".join([f"{v:g}" for v in result['y']])
+                self.result_output.append(f"<b>Двойственные оценки (y):</b> {y_str}")
                 
         except ValueError as e:
             self.result_output.setText(f"<span style='color:red;'>Ошибка ввода: {e}</span>")

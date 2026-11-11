@@ -4,13 +4,14 @@ from TransportSolver import solve_transport
 
 # --- Тест 1: Прямой симплекс-метод ---
 print("=== ТЕСТ 1: Прямой симплекс ===")
-c1 = [3, 2]
+c1 = [2, 1]
 A1 = [
-    [1, 1],
-    [2, 1]
+    [-1, 3],
+    [2, 1],
+    [1, -1]
 ]
-b1 = [4, 6]
-signs1 = ["<=", "<="]
+b1 = [6, 9, 3]
+signs1 = ["<=", "<=", "<="]
 
 res1 = solve_problem(c1, A1, b1, signs1, objective="max")
 print(f"Статус: {res1['status']}")
