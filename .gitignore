@@ -1,2 +1,17 @@
+# Виртуальные окружения Python
+.venv/
+.venv312/
+venv/
+env/
+
+# Кэш Python
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Настройки IDE
+.idea/
+.vscode/
+
+# Временные файлы
+*.log
+.DS_Store

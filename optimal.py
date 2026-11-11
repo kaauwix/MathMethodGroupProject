@@ -5,7 +5,6 @@ from AuxiliaryFun import EPSILON
 
 def check_optimality(c, A, b, x, signs, tolerance=1e-7):
     """
-    Проверяет план x на оптимальность.
     Работает для задач вида: f=(c,x)->max, A x <= b, x >= 0.
     Возвращает: dict(status, message, y=None или найденное y, details)
     """
@@ -74,8 +73,7 @@ def check_optimality(c, A, b, x, signs, tolerance=1e-7):
         rhs.append(0.0)
 
     if not eq_rows:
-        # Нет условий — любое y>=0 подходит; проверяем, существует ли допустимое
-        # тривиально y=0, если c<=0
+        # Нет условий — любое y>=0 подходит; проверяем, существует ли допустимое тривиально y=0, если c<=0
         if all(cj <= tolerance for cj in c):
             y = [0.0] * m2
             return {
