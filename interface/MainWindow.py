@@ -1,4 +1,3 @@
-
 # MainWindow.py
 
 from PyQt5.QtWidgets import (
@@ -52,7 +51,7 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("card")
-        sidebar.setFixedWidth(270)
+        sidebar.setFixedWidth(280) # Немного увеличил ширину, чтобы всё влезало
 
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(16, 24, 16, 20)
@@ -70,6 +69,7 @@ class MainWindow(QMainWindow):
         subtitle = QLabel("Математические методы")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setObjectName("subtitle")
+        subtitle.setStyleSheet("font-size: 16px;") # Уменьшил шрифт подзаголовка
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -99,6 +99,10 @@ class MainWindow(QMainWindow):
             button.setObjectName("navigationButton")
             button.setCheckable(True)
             button.setMinimumHeight(55)
+            
+            # Уменьшаем шрифт, чтобы длинные слова влезали
+            button.setStyleSheet("font-size: 17px; text-align: left; padding-left: 15px;")
+            
             button.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Fixed
@@ -115,7 +119,9 @@ class MainWindow(QMainWindow):
 
         footer = QLabel("Решение задач оптимизации")
         footer.setAlignment(Qt.AlignCenter)
+        footer.setWordWrap(True) # Разрешаем перенос, если не влезает
         footer.setObjectName("subtitle")
+        footer.setStyleSheet("font-size: 14px;")
 
         layout.addWidget(footer)
 
@@ -143,6 +149,7 @@ class MainWindow(QMainWindow):
 
         self.page_title = QLabel("Симплекс-метод")
         self.page_title.setObjectName("title")
+        self.page_title.setStyleSheet("font-size: 28px; font-weight: bold; color: #CB6892;") # Чуть уменьшил заголовок
 
         header_layout.addWidget(self.page_title)
         header_layout.addStretch()
@@ -152,33 +159,17 @@ class MainWindow(QMainWindow):
         # Страницы приложения
         self.pages = QStackedWidget()
 
-        self.pages.addWidget(
-            self.create_placeholder(
-                "Симплекс-метод",
-                "Автоматический выбор метода решения задачи."
-            )
-        )
+        from interface.SimplexPage import SimplexPage
+        self.pages.addWidget(SimplexPage())
 
-        self.pages.addWidget(
-            self.create_placeholder(
-                "Одновременный поиск",
-                "Совместное решение прямым и двойственным симплекс-методами."
-            )
-        )
+        from interface.DualPage import DualPage
+        self.pages.addWidget(DualPage())
 
-        self.pages.addWidget(
-            self.create_placeholder(
-                "Проверка оптимальности",
-                "Проверка заданного пользователем плана на оптимальность."
-            )
-        )
+        from interface.OptimalityPage import OptimalityPage
+        self.pages.addWidget(OptimalityPage())
 
-        self.pages.addWidget(
-            self.create_placeholder(
-                "Транспортная задача",
-                "Построение и оптимизация транспортного плана."
-            )
-        )
+        from interface.TransportPage import TransportPage
+        self.pages.addWidget(TransportPage())
 
         layout.addWidget(self.pages, 1)
 
@@ -186,36 +177,6 @@ class MainWindow(QMainWindow):
         self.change_page(0)
 
         return content
-
-    # =========================
-    # ВРЕМЕННАЯ СТРАНИЦА
-    # =========================
-
-    def create_placeholder(self, title, description):
-
-        page = QFrame()
-        page.setObjectName("card")
-
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(15)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            font-size: 23px;
-            font-weight: bold;
-            color: #CB6892;
-        """)
-
-        description_label = QLabel(description)
-        description_label.setObjectName("subtitle")
-        description_label.setWordWrap(True)
-
-        layout.addWidget(title_label)
-        layout.addWidget(description_label)
-        layout.addStretch()
-
-        return page
 
     # =========================
     # ПЕРЕКЛЮЧЕНИЕ РАЗДЕЛОВ
