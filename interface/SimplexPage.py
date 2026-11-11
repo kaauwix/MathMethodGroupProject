@@ -1,21 +1,23 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QGroupBox, QComboBox, QScrollArea,
-    QFrame, QSpinBox
+    QFrame, QSpinBox, QTabWidget
 )
 from PyQt5.QtCore import Qt
 from MethodSelection import solve_problem
+from interface.StepViewers import StepsViewer
+
 
 class SimplexPage(QWidget):
     def __init__(self):
         super().__init__()
-        self.n_vars = 2  # По умолчанию 2 переменные
-        self.m_cons = 2  # По умолчанию 2 ограничения
-        
-        self.var_inputs = []      # Для коэффициентов целевой функции
-        self.cons_inputs = []     # Для коэффициентов ограничений
-        self.cons_signs = []      # Для знаков ограничений
-        self.cons_b_inputs = []   # Для правых частей (b)
+        self.n_vars = 2
+        self.m_cons = 2
+
+        self.var_inputs = []
+        self.cons_inputs = []
+        self.cons_signs = []
+        self.cons_b_inputs = []
 
         self.init_ui()
 
@@ -24,9 +26,7 @@ class SimplexPage(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(15)
 
-        # ==========================================
-        # БЛОК 1: НАСТРОЙКА РАЗМЕРНОСТИ
-        # ==========================================
+        # --- Размерность ---
         size_group = QGroupBox("Размерность задачи")
         size_layout = QHBoxLayout()
 
@@ -47,39 +47,39 @@ class SimplexPage(QWidget):
         size_group.setLayout(size_layout)
         main_layout.addWidget(size_group)
 
-        # ==========================================
-        # БЛОК 2: ПРОКРУЧИВАЕМАЯ ОБЛАСТЬ ДЛЯ ВВОДА
-        # ==========================================
+        # --- Область ввода ---
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        
+
         self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)
         self.scroll_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll_layout.setSpacing(15)
-        
+
         scroll.setWidget(self.scroll_content)
         main_layout.addWidget(scroll, 1)
 
-        # ==========================================
-        # БЛОК 3: РЕЗУЛЬТАТ
-        # ==========================================
+        # --- Вкладки результата ---
+        self.result_tabs = QTabWidget()
+
         self.result_output = QTextEdit()
         self.result_output.setReadOnly(True)
-        self.result_output.setMaximumHeight(200)
-        main_layout.addWidget(QLabel("<b>Результат решения:</b>"))
-        main_layout.addWidget(self.result_output)
+        self.result_tabs.addTab(self.result_output, "Результат")
 
-        # Первичная отрисовка
+        self.steps_viewer = StepsViewer()
+        self.result_tabs.addTab(self.steps_viewer, "Шаги решения")
+
+        main_layout.addWidget(QLabel("<b>Результат решения:</b>"))
+        main_layout.addWidget(self.result_tabs, 1)
+
         self.rebuild_ui()
 
+    # ------------------------------------------------------------------
     def rebuild_ui(self):
-        """Перерисовывает поля ввода при изменении размерности"""
         self.n_vars = self.n_vars_spin.value()
         self.m_cons = self.m_cons_spin.value()
 
-        # Очищаем старые виджеты
         while self.scroll_layout.count():
             item = self.scroll_layout.takeAt(0)
             if item.widget():
@@ -90,7 +90,7 @@ class SimplexPage(QWidget):
         self.cons_signs.clear()
         self.cons_b_inputs.clear()
 
-        # --- Блок целевой функции ---
+        # --- Целевая функция ---
         obj_group = QGroupBox("Целевая функция")
         obj_layout = QHBoxLayout()
         obj_layout.setAlignment(Qt.AlignLeft)
@@ -99,19 +99,19 @@ class SimplexPage(QWidget):
         self.obj_combo.addItems(["max", "min"])
         obj_layout.addWidget(QLabel("f(x) ="))
         obj_layout.addWidget(self.obj_combo)
-        obj_layout.addWidget(QLabel(":")) 
+        obj_layout.addWidget(QLabel(":"))
 
         for i in range(self.n_vars):
             if i > 0:
                 obj_layout.addWidget(QLabel("+"))
-            
+
             inp = QLineEdit()
             inp.setFixedWidth(60)
             inp.setAlignment(Qt.AlignCenter)
             inp.setText("0")
             self.var_inputs.append(inp)
             obj_layout.addWidget(inp)
-            
+
             lbl = QLabel(f"x<sub>{i+1}</sub>")
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
@@ -120,7 +120,7 @@ class SimplexPage(QWidget):
         obj_group.setLayout(obj_layout)
         self.scroll_layout.addWidget(obj_group)
 
-        # --- Блок ограничений ---
+        # --- Ограничения ---
         cons_group = QGroupBox("Ограничения")
         cons_layout = QVBoxLayout()
 
@@ -131,7 +131,7 @@ class SimplexPage(QWidget):
             for j in range(self.n_vars):
                 if j > 0:
                     row_layout.addWidget(QLabel("+"))
-                
+
                 inp = QLineEdit()
                 inp.setFixedWidth(60)
                 inp.setAlignment(Qt.AlignCenter)
@@ -162,7 +162,6 @@ class SimplexPage(QWidget):
         cons_group.setLayout(cons_layout)
         self.scroll_layout.addWidget(cons_group)
 
-        # Кнопка "Решить"
         solve_btn = QPushButton("РЕШИТЬ ЗАДАЧУ")
         solve_btn.setObjectName("solveButton")
         solve_btn.setMinimumHeight(50)
@@ -170,44 +169,50 @@ class SimplexPage(QWidget):
         self.scroll_layout.addWidget(solve_btn)
         self.scroll_layout.addStretch()
 
-    # ==========================================
-    # ОБРАБОТКА НАЖАТИЯ КНОПКИ "РЕШИТЬ"
-    # ==========================================
+    # ------------------------------------------------------------------
     def on_solve(self):
         try:
-            # 1. Собираем целевую функцию
             c = [float(inp.text()) for inp in self.var_inputs]
             objective = self.obj_combo.currentText()
 
-            # 2. Собираем ограничения
             A = []
             for i in range(self.m_cons):
-                row = [float(self.cons_inputs[i * self.n_vars + j].text()) for j in range(self.n_vars)]
+                row = [float(self.cons_inputs[i * self.n_vars + j].text())
+                       for j in range(self.n_vars)]
                 A.append(row)
 
             b = [float(inp.text()) for inp in self.cons_b_inputs]
             signs = [combo.currentText() for combo in self.cons_signs]
 
-            # 3. Вызываем решатель
             result = solve_problem(c, A, b, signs, objective)
 
-            # 4. Выводим результат
             self.result_output.clear()
             self.result_output.append(f"<b>Статус:</b> {result.get('status')}")
             self.result_output.append(f"<b>Сообщение:</b> {result.get('message')}")
-            
+
             if result.get('solution') is not None:
-                # Красиво форматируем решение (без лишних нулей)
                 sol_str = ", ".join([f"{x:g}" for x in result['solution']])
                 self.result_output.append(f"<b>Решение (x):</b> {sol_str}")
-                
                 obj_val = result.get('objective_value')
                 if obj_val is not None:
-                    self.result_output.append(f"<b>Значение функции (f):</b> {obj_val:g}")
+                    self.result_output.append(
+                        f"<b>Значение функции (f):</b> {obj_val:g}"
+                    )
             else:
-                self.result_output.append("<span style='color:red;'>Оптимальное решение не найдено.</span>")
+                self.result_output.append(
+                    "<span style='color:red;'>Оптимальное решение не найдено.</span>"
+                )
+
+            self.steps_viewer.show_steps(result.get("steps", []))
 
         except ValueError:
-            self.result_output.setText("<span style='color:red;'>Ошибка ввода: убедитесь, что все поля заполнены числами!</span>")
+            self.result_output.setText(
+                "<span style='color:red;'>Ошибка ввода: убедитесь, "
+                "что все поля заполнены числами!</span>"
+            )
+            self.steps_viewer.clear()
         except Exception as e:
-            self.result_output.setText(f"<span style='color:red;'>Ошибка решения: {e}</span>")
+            self.result_output.setText(
+                f"<span style='color:red;'>Ошибка решения: {e}</span>"
+            )
+            self.steps_viewer.clear()

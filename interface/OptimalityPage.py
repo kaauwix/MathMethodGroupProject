@@ -6,16 +6,17 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from optimal import check_optimality
 
+
 class OptimalityPage(QWidget):
     def __init__(self):
         super().__init__()
         self.n_vars = 2
         self.m_cons = 2
-        
-        self.var_inputs = []      
-        self.cons_inputs = []     
-        self.cons_signs = []      
-        self.cons_b_inputs = []   
+
+        self.var_inputs = []
+        self.cons_inputs = []
+        self.cons_signs = []
+        self.cons_b_inputs = []
 
         self.init_ui()
 
@@ -24,9 +25,7 @@ class OptimalityPage(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(15)
 
-        # ==========================================
-        # БЛОК 1: НАСТРОЙКА РАЗМЕРНОСТИ
-        # ==========================================
+        # --- Размерность ---
         size_group = QGroupBox("Размерность задачи")
         size_layout = QHBoxLayout()
 
@@ -47,24 +46,20 @@ class OptimalityPage(QWidget):
         size_group.setLayout(size_layout)
         main_layout.addWidget(size_group)
 
-        # ==========================================
-        # БЛОК 2: ПРОКРУЧИВАЕМАЯ ОБЛАСТЬ
-        # ==========================================
+        # --- Прокрутка ввода ---
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        
+
         self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)
         self.scroll_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll_layout.setSpacing(15)
-        
+
         scroll.setWidget(self.scroll_content)
         main_layout.addWidget(scroll, 1)
 
-        # ==========================================
-        # БЛОК 3: РЕЗУЛЬТАТ
-        # ==========================================
+        # --- Результат ---
         self.result_output = QTextEdit()
         self.result_output.setReadOnly(True)
         self.result_output.setMaximumHeight(250)
@@ -73,6 +68,7 @@ class OptimalityPage(QWidget):
 
         self.rebuild_ui()
 
+    # ------------------------------------------------------------------
     def rebuild_ui(self):
         self.n_vars = self.n_vars_spin.value()
         self.m_cons = self.m_cons_spin.value()
@@ -101,14 +97,14 @@ class OptimalityPage(QWidget):
         for i in range(self.n_vars):
             if i > 0:
                 obj_layout.addWidget(QLabel("+"))
-            
+
             inp = QLineEdit()
             inp.setFixedWidth(60)
             inp.setAlignment(Qt.AlignCenter)
             inp.setText("0")
             self.var_inputs.append(inp)
             obj_layout.addWidget(inp)
-            
+
             lbl = QLabel(f"x<sub>{i+1}</sub>")
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
@@ -128,7 +124,7 @@ class OptimalityPage(QWidget):
             for j in range(self.n_vars):
                 if j > 0:
                     row_layout.addWidget(QLabel("+"))
-                
+
                 inp = QLineEdit()
                 inp.setFixedWidth(60)
                 inp.setAlignment(Qt.AlignCenter)
@@ -163,13 +159,14 @@ class OptimalityPage(QWidget):
         plan_group = QGroupBox("Проверяемый план x")
         plan_layout = QHBoxLayout()
         self.plan_input = QLineEdit()
-        self.plan_input.setPlaceholderText("Например: 2, 2 (через запятую)")
+        self.plan_input.setPlaceholderText(
+            "Например: 2, 2 (через запятую)"
+        )
         plan_layout.addWidget(QLabel("Значения переменных:"))
         plan_layout.addWidget(self.plan_input)
         plan_group.setLayout(plan_layout)
         self.scroll_layout.addWidget(plan_group)
 
-        # Кнопка
         check_btn = QPushButton("ПРОВЕРИТЬ ПЛАН")
         check_btn.setObjectName("solveButton")
         check_btn.setMinimumHeight(50)
@@ -177,45 +174,62 @@ class OptimalityPage(QWidget):
         self.scroll_layout.addWidget(check_btn)
         self.scroll_layout.addStretch()
 
+    # ------------------------------------------------------------------
     def on_check(self):
         try:
-            # Сборка задачи
             c = [float(inp.text()) for inp in self.var_inputs]
             A = []
             for i in range(self.m_cons):
-                row = [float(self.cons_inputs[i * self.n_vars + j].text()) for j in range(self.n_vars)]
+                row = [float(self.cons_inputs[i * self.n_vars + j].text())
+                       for j in range(self.n_vars)]
                 A.append(row)
             b = [float(inp.text()) for inp in self.cons_b_inputs]
             signs = [combo.currentText() for combo in self.cons_signs]
 
-            # Сборка плана x
             plan_text = self.plan_input.text().replace(' ', '')
             x = [float(val) for val in plan_text.split(',')]
 
             if len(x) != self.n_vars:
-                raise ValueError(f"В плане должно быть ровно {self.n_vars} чисел.")
+                raise ValueError(
+                    f"В плане должно быть ровно {self.n_vars} чисел."
+                )
 
-            # Вызов
             result = check_optimality(c, A, b, x, signs)
 
-            # Вывод
             self.result_output.clear()
             status = result.get('status')
-            
-            if status == 'optimal':
-                self.result_output.append(f"<span style='color:green; font-size:16px;'><b>✔ План ОПТИМАЛЕН</b></span>")
-            elif status == 'not_feasible':
-                self.result_output.append(f"<span style='color:red; font-size:16px;'><b>✘ План НЕДОПУСТИМ</b></span>")
-            else:
-                self.result_output.append(f"<span style='color:red; font-size:16px;'><b>✘ План НЕ ОПТИМАЛЕН</b></span>")
 
-            self.result_output.append(f"<b>Сообщение:</b> {result.get('message')}")
-            
+            if status == 'optimal':
+                self.result_output.append(
+                    "<span style='color:green; font-size:16px;'>"
+                    "<b>✔ План ОПТИМАЛЕН</b></span>"
+                )
+            elif status == 'not_feasible':
+                self.result_output.append(
+                    "<span style='color:red; font-size:16px;'>"
+                    "<b>✘ План НЕДОПУСТИМ</b></span>"
+                )
+            else:
+                self.result_output.append(
+                    "<span style='color:red; font-size:16px;'>"
+                    "<b>✘ План НЕ ОПТИМАЛЕН</b></span>"
+                )
+
+            self.result_output.append(
+                f"<b>Сообщение:</b> {result.get('message')}"
+            )
+
             if result.get('y') is not None:
                 y_str = ", ".join([f"{v:g}" for v in result['y']])
-                self.result_output.append(f"<b>Двойственные оценки (y):</b> {y_str}")
-                
+                self.result_output.append(
+                    f"<b>Двойственные оценки (y):</b> {y_str}"
+                )
+
         except ValueError as e:
-            self.result_output.setText(f"<span style='color:red;'>Ошибка ввода: {e}</span>")
+            self.result_output.setText(
+                f"<span style='color:red;'>Ошибка ввода: {e}</span>"
+            )
         except Exception as e:
-            self.result_output.setText(f"<span style='color:red;'>Ошибка проверки: {e}</span>")
+            self.result_output.setText(
+                f"<span style='color:red;'>Ошибка проверки: {e}</span>"
+            )

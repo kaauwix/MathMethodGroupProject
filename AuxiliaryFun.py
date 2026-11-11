@@ -35,8 +35,7 @@ def calculate_deltas(tableau, c, basis):
 def add_table_step(steps, tableau, basis, variable_names, c, description, pivot=None):
     """
     Сохраняет текущую симплексную таблицу.
-    Внутри сохраняются все переменные, включая дополнительные.
-    При отображении в консоли позже будем показывать только исходные переменные x1, x2, ...
+    Дополнительно кладём полный вектор c (коэффициенты целевой функции), чтобы GUI мог показать строку c_j. Логика решения не меняется.
     """
     cb = [c[index] for index in basis]
     zj = calculate_zj(tableau, c, basis)
@@ -47,7 +46,10 @@ def add_table_step(steps, tableau, basis, variable_names, c, description, pivot=
         "basis": basis[:],
         "basis_names": [variable_names[index] for index in basis],
         "variable_names": variable_names[:],
-        "cb": cb[:], "zj": zj[:], "deltas": deltas[:],
+        "cb": cb[:],
+        "zj": zj[:],
+        "deltas": deltas[:],
+        "c": c[:],
         "pivot": pivot.copy() if pivot else None
     })
 
