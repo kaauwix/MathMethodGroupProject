@@ -24,12 +24,25 @@ class SimplexPage(QWidget):
         self.mib_btn = None
 
         self.init_ui()
-        self.load_example()
+        self.load_preset_example(0) # Загружаем первый пример при запуске
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(15)
+
+        # --- Выбор шаблона ---
+        preset_layout = QHBoxLayout()
+        preset_layout.addWidget(QLabel("<b>Выберите пример:</b>"))
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItem("Двойственный симплекс или МИБ")
+        self.preset_combo.addItem("Прямой симплекс")
+        self.preset_combo.addItem("Метод искусственного базиса")
+        self.preset_combo.addItem("Свободная переменная")
+        self.preset_combo.currentIndexChanged.connect(self.load_preset_example)
+        preset_layout.addWidget(self.preset_combo)
+        preset_layout.addStretch()
+        main_layout.addLayout(preset_layout)
 
         # --- Размерность ---
         size_group = QGroupBox("Размерность задачи")
@@ -52,28 +65,21 @@ class SimplexPage(QWidget):
         size_group.setLayout(size_layout)
         main_layout.addWidget(size_group)
 
-        # --- Контейнер ввода (без QScrollArea) ---
+        # --- Контейнер ввода ---
         self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)
         self.scroll_layout.setContentsMargins(0, 0, 0, 0)
         self.scroll_layout.setSpacing(15)
-        
-        # 0 — блок ввода не растягивается на пустоту
         main_layout.addWidget(self.scroll_content, 0)
 
         # --- Вкладки результата ---
         self.result_tabs = QTabWidget()
-
         self.result_output = QTextEdit()
         self.result_output.setReadOnly(True)
         self.result_tabs.addTab(self.result_output, "Результат")
-
         self.steps_viewer = StepsViewer()
         self.result_tabs.addTab(self.steps_viewer, "Шаги решения")
-
         main_layout.addWidget(QLabel("<b>Результат решения:</b>"))
-        
-        # 1 — результаты занимают всё оставшееся место
         main_layout.addWidget(self.result_tabs, 1)
 
         self.rebuild_ui()
@@ -120,7 +126,6 @@ class SimplexPage(QWidget):
             lbl.setStyleSheet("font-size: 20px;")
             obj_layout.addWidget(lbl)
 
-            # тип переменной
             type_combo = QComboBox()
             type_combo.addItem("≥ 0", "nonneg")
             type_combo.addItem("свободная", "free")
@@ -179,59 +184,82 @@ class SimplexPage(QWidget):
         solve_btn.clicked.connect(self.on_solve)
         self.scroll_layout.addWidget(solve_btn)
 
-        # Кнопка «двойственным симплексом» — появляется только когда
-        # solve_problem вернул «доступен» (dual_available / dual_available_force)
         self.dual_btn = QPushButton("РЕШИТЬ ДВОЙСТВЕННЫМ СИМПЛЕКСОМ")
         self.dual_btn.setObjectName("solveButton")
         self.dual_btn.setMinimumHeight(48)
         self.dual_btn.setVisible(False)
-        self.dual_btn.clicked.connect(
-            lambda: self.on_solve(force_method="dual")
-        )
+        self.dual_btn.clicked.connect(lambda: self.on_solve(force_method="dual"))
         self.scroll_layout.addWidget(self.dual_btn)
 
-        # Кнопка «всё равно МИБ» — альтернатива
         self.mib_btn = QPushButton("ВСЁ РАВНО РЕШИТЬ МИБ")
-        self.mib_btn.setStyleSheet(
-            "background-color: #F4D6E3; color: #49333D; "
-            "border: 1px solid #EBC6D7; border-radius: 9px; padding: 10px;"
-        )
+        self.mib_btn.setStyleSheet("background-color: #F4D6E3; color: #49333D; border: 1px solid #EBC6D7; border-radius: 9px; padding: 10px;")
         self.mib_btn.setMinimumHeight(42)
         self.mib_btn.setVisible(False)
-        self.mib_btn.clicked.connect(
-            lambda: self.on_solve(force_method="mib")
-        )
+        self.mib_btn.clicked.connect(lambda: self.on_solve(force_method="mib"))
         self.scroll_layout.addWidget(self.mib_btn)
 
     # ------------------------------------------------------------------
-    def load_example(self):
-        # Задача с вашего скриншота
-        self.n_vars_spin.setValue(4)
-        self.m_cons_spin.setValue(3)
-        self.rebuild_ui()
-
-        self.obj_combo.setCurrentText("max")
-        
-        # Целевая функция: 0x1 + 1x2 - 3x3 + 0x4
-        self.var_inputs[0].setText("0")
-        self.var_inputs[1].setText("1")
-        self.var_inputs[2].setText("-3")
-        self.var_inputs[3].setText("0")
-
-        # Ограничения
-        constraints = [
-            ([0.0, 1.0, 0.0, 1.0], "=", 3.0),
-            ([4.0, 0.0, 2.0, 0.0], ">=", 7.0),
-            ([4.0, 0.0, 1.0, 0.0], ">=", 5.0),
-        ]
-
-        for i, (coeffs, sign, rhs) in enumerate(constraints):
-            for j in range(self.n_vars):
-                self.cons_inputs[i * self.n_vars + j].setText(
-                    self._fmt(coeffs[j])
-                )
-            self.cons_signs[i].setCurrentText(sign)
-            self.cons_b_inputs[i].setText(self._fmt(rhs))
+    def load_preset_example(self, index):
+        """Загружает один из готовых примеров."""
+        if index == 0:
+            # Тот самый пример с двойственным симплексом
+            self.n_vars_spin.setValue(4)
+            self.m_cons_spin.setValue(3)
+            self.rebuild_ui()
+            self.obj_combo.setCurrentText("min")
+            for i, val in enumerate(["1", "1", "-1", "-4"]):
+                self.var_inputs[i].setText(val)
+            constraints = [
+                ([3.0, 4.0, -1.0, 0.0], "=", 3.0),
+                ([4.0, 3.0, 0.0, 0.0], ">=", 6.0),
+                ([1.0, 1.0, 0.0, 1.0], "=", 3.0),
+            ]
+        elif index == 1:
+            # Классический прямой симплекс
+            self.n_vars_spin.setValue(2)
+            self.m_cons_spin.setValue(2)
+            self.rebuild_ui()
+            self.obj_combo.setCurrentText("max")
+            for i, val in enumerate(["2", "1"]):
+                self.var_inputs[i].setText(val)
+            constraints = [
+                ([-1.0, 3.0], "<=", 6.0),
+                ([2.0, 1.0], "<=", 9.0),
+                ([1.0, -1.0], "<=", 3.0),
+            ]
+        elif index == 2:
+            # Задача, где нужен МИБ (нет базиса)
+            self.n_vars_spin.setValue(3)
+            self.m_cons_spin.setValue(2)
+            self.rebuild_ui()
+            self.obj_combo.setCurrentText("max")
+            for i, val in enumerate(["2", "3", "1"]):
+                self.var_inputs[i].setText(val)
+            constraints = [
+                ([1.0, 1.0, 1.0], "=", 5.0),
+                ([2.0, 1.0, 0.0], ">=", 4.0),
+            ]
+        elif index == 3:
+            # Пример со свободной переменной
+            self.n_vars_spin.setValue(2)
+            self.m_cons_spin.setValue(2)
+            self.rebuild_ui()
+            self.obj_combo.setCurrentText("max")
+            for i, val in enumerate(["2", "3"]):
+                self.var_inputs[i].setText(val)
+            self.var_type_combos[0].setCurrentIndex(1) # x1 - свободная
+            constraints = [
+                ([1.0, 2.0], "<=", 6.0),
+                ([3.0, 1.0], "<=", 9.0),
+            ]
+            
+        # Заполнение ограничений для всех примеров
+        if index in (0, 1, 2, 3):
+            for i, (coeffs, sign, rhs) in enumerate(constraints):
+                for j in range(self.n_vars):
+                    self.cons_inputs[i * self.n_vars + j].setText(self._fmt(coeffs[j]))
+                self.cons_signs[i].setCurrentText(sign)
+                self.cons_b_inputs[i].setText(self._fmt(rhs))
 
     @staticmethod
     def _fmt(v):
@@ -248,20 +276,14 @@ class SimplexPage(QWidget):
 
             A = []
             for i in range(self.m_cons):
-                row = [float(self.cons_inputs[i * self.n_vars + j].text())
-                       for j in range(self.n_vars)]
+                row = [float(self.cons_inputs[i * self.n_vars + j].text()) for j in range(self.n_vars)]
                 A.append(row)
 
             b = [float(inp.text()) for inp in self.cons_b_inputs]
             signs = [combo.currentText() for combo in self.cons_signs]
 
-            result = solve_problem(
-                c, A, b, signs, objective,
-                force_method=force_method,
-                var_types=var_types
-            )
+            result = solve_problem(c, A, b, signs, objective, force_method=force_method, var_types=var_types)
 
-            # --- Специальный случай: доступен двойственный (и/или МИБ) ---
             if result.get("status") in ("dual_available", "dual_available_force"):
                 self._show_dual_offer(result)
                 return
@@ -271,84 +293,38 @@ class SimplexPage(QWidget):
 
         except ValueError:
             self._hide_dual_offer()
-            self.result_output.setText(
-                "<span style='color:red; font-size: 18px;'>"
-                "Ошибка ввода: убедитесь, что все поля заполнены числами!"
-                "</span>"
-            )
+            self.result_output.setText("<span style='color:red; font-size: 18px;'>Ошибка ввода: проверьте числа!</span>")
             self.steps_viewer.clear()
         except Exception as e:
             self._hide_dual_offer()
-            self.result_output.setText(
-                f"<span style='color:red; font-size: 18px;'>"
-                f"Ошибка решения: {e}"
-                f"</span>"
-            )
+            self.result_output.setText(f"<span style='color:red; font-size: 18px;'>Ошибка решения: {e}</span>")
             self.steps_viewer.clear()
 
-    # ------------------------------------------------------------------
     def _show_dual_offer(self, result):
         self.result_output.clear()
         status = result.get("status")
-        
         if status == "dual_available_force":
-            self.result_output.append(
-                "<span style='color:#d97706; font-size: 18px;'>"
-                "<b>Внимание!</b> Задача имеет b &lt; 0, но также есть Δ &lt; 0.<br><br>"
-                "Двойственный симплекс в классическом виде не применим, "
-                "но вы можете <b>попробовать</b> запустить его принудительно. "
-                "Если алгоритм не сойдётся — используйте <b>МИБ</b>."
-                "</span>"
-            )
+            self.result_output.append("<span style='color:#d97706; font-size: 18px;'><b>Внимание!</b> Есть Δ &lt; 0. Можно попробовать двойственный принудительно или МИБ.</span>")
         else:
-            self.result_output.append(
-                "<span style='color:#49333D; font-size: 18px;'>"
-                "<b>Задача двойственно допустима!</b><br><br>"
-                "Все Δ_j ≥ 0 и есть b_i &lt; 0. Доступны <b>два пути</b>:<br>"
-                "• <b>Двойственный симплекс</b> — без искусственных переменных (рекомендуется).<br>"
-                "• <b>МИБ</b> — метод искусственного базиса.<br><br>"
-                "Выберите кнопку ниже."
-                "</span>"
-            )
-            
+            self.result_output.append("<span style='color:#49333D; font-size: 18px;'><b>Задача двойственно допустима!</b> Выберите метод ниже.</span>")
         self.steps_viewer.show_steps(result.get("steps", []))
-
-        if self.dual_btn:
-            self.dual_btn.setVisible(True)
-        if self.mib_btn:
-            self.mib_btn.setVisible(True)
+        if self.dual_btn: self.dual_btn.setVisible(True)
+        if self.mib_btn: self.mib_btn.setVisible(True)
 
     def _hide_dual_offer(self):
-        if self.dual_btn:
-            self.dual_btn.setVisible(False)
-        if self.mib_btn:
-            self.mib_btn.setVisible(False)
+        if self.dual_btn: self.dual_btn.setVisible(False)
+        if self.mib_btn: self.mib_btn.setVisible(False)
 
     def _show_result(self, result):
         self.result_output.clear()
-        
-        # Увеличенный шрифт для всего блока результата
-        self.result_output.append(
-            f"<div style='font-size: 18px;'>"
-            f"<b>Статус:</b> {result.get('status')}<br>"
-            f"<b>Сообщение:</b> {result.get('message')}<br>"
-        )
-
+        self.result_output.append(f"<div style='font-size: 18px;'><b>Статус:</b> {result.get('status')}<br><b>Сообщение:</b> {result.get('message')}<br>")
         if result.get("solution") is not None:
             sol_str = ", ".join([f"{x:g}" for x in result["solution"]])
-            self.result_output.append(
-                f"<b>Решение (x):</b> {sol_str}<br>"
-            )
+            self.result_output.append(f"<b>Решение (x):</b> {sol_str}<br>")
             obj_val = result.get("objective_value")
             if obj_val is not None:
-                self.result_output.append(
-                    f"<b>Значение функции (f):</b> {obj_val:g}<br>"
-                )
+                self.result_output.append(f"<b>Значение функции (f):</b> {obj_val:g}<br>")
         else:
-            self.result_output.append(
-                "<span style='color:red;'>Оптимальное решение не найдено.</span>"
-            )
-        
+            self.result_output.append("<span style='color:red;'>Оптимальное решение не найдено.</span>")
         self.result_output.append("</div>")
-
         self.steps_viewer.show_steps(result.get("steps", []))
