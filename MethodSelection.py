@@ -39,10 +39,8 @@ def build_dual_tableau(c, A, b, signs, objective, var_types=None):
     # 1. Ищем базис в равенствах (=)
     for i in range(m):
         if work_signs[i] == "=":
-            # Если есть +1, оставляем
             if any(abs(val - 1.0) <= EPSILON for val in work_A[i]):
                 continue
-            # Если есть -1, умножаем строку на -1
             if any(abs(val + 1.0) <= EPSILON for val in work_A[i]):
                 work_A[i] = [-v for v in work_A[i]]
                 work_b[i] = -work_b[i]
@@ -70,7 +68,6 @@ def build_dual_tableau(c, A, b, signs, objective, var_types=None):
     if basis is None:
         return None
 
-    # Формируем начальную таблицу
     tableau = build_tableau(work_A, work_b)
     
     problem = {
@@ -90,7 +87,18 @@ def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
     if var_types is None:
         var_types = ["nonneg"] * len(c)
 
-    # 0. ПРИНУДИТЕЛЬНЫЙ ДВОЙСТВЕННЫЙ (запускается по кнопке)
+    # 0.1. БЫСТРАЯ ПРОВЕРКА: А ВДРУГ УЖЕ ОПТИМАЛЬНО?
+    problem_norm = normalize_problem(c, A, b, signs, objective, var_types=var_types)
+    tableau_norm = build_tableau(problem_norm["A"], problem_norm["b"])
+    basis_norm = find_initial_basis(problem_norm["A"])
+    
+    if basis_norm is not None:
+        info = determine_method(tableau_norm, problem_norm["c"], basis_norm)
+        if info["method"] == "optimal":
+            from PrimalSimplex import primal_simplex_prepared
+            return primal_simplex_prepared(problem_norm, tableau_norm, basis_norm, max_iterations)
+
+    # 0. ПРИНУДИТЕЛЬНЫЙ ДВОЙСТВЕННЫЙ
     if force_method == "dual":
         res = build_dual_tableau(c, A, b, signs, objective, var_types=var_types)
         if res is None:
@@ -99,11 +107,10 @@ def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
         from DualSimplex import dual_simplex_prepared
         return dual_simplex_prepared(problem, tableau, basis, max_iterations, force=True)
 
-    # 1. ПРИНУДИТЕЛЬНЫЙ МИБ (запускается по кнопке)
+    # 1. ПРИНУДИТЕЛЬНЫЙ МИБ
     if force_method == "mib":
-        problem = normalize_problem(c, A, b, signs, objective, var_types=var_types)
         from MIB import artificial_basis_prepared
-        return artificial_basis_prepared(problem, max_iterations)
+        return artificial_basis_prepared(problem_norm, max_iterations)
 
     # 2. ПРОБУЕМ СОБРАТЬ ТАБЛИЦУ ДЛЯ ДВОЙСТВЕННОГО
     dual_res = build_dual_tableau(c, A, b, signs, objective, var_types=var_types)
@@ -118,7 +125,6 @@ def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
         if has_neg_b and not has_neg_delta:
             add_text_step(problem_d["steps"], "Выбор метода", "Все Δ_j ≥ 0, но есть отрицательные b. Доступен двойственный симплекс.")
             
-            # Возвращаем статус, чтобы GUI показал кнопки
             return {
                 "status": "dual_available",
                 "message": "Задача двойственно допустима. Выберите метод решения.",
@@ -140,9 +146,7 @@ def solve_problem(c, A, b, signs, objective="max", max_iterations=1000,
                 "mib_available": True
             }
 
-    # 3. ЕСЛИ ДВОЙСТВЕННЫЙ НЕ ПОДОШЕЛ (например, есть отриц. дельты) — ИДЕМ В МИБ
-    problem = normalize_problem(c, A, b, signs, objective, var_types=var_types)
-    steps = problem["steps"]
-    add_text_step(steps, "Выбор метода", "Двойственный симплекс не применим (есть отриц. Δ или нет базиса). Запускаем МИБ.")
+    # 3. ЕСЛИ ДВОЙСТВЕННЫЙ НЕ ПОДОШЕЛ — ИДЕМ В МИБ
+    add_text_step(problem_norm["steps"], "Выбор метода", "Двойственный симплекс не применим (есть отриц. Δ или нет базиса). Запускаем МИБ.")
     from MIB import artificial_basis_prepared
-    return artificial_basis_prepared(problem, max_iterations)
+    return artificial_basis_prepared(problem_norm, max_iterations)

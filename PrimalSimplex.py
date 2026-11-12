@@ -1,4 +1,4 @@
-#Прямой симплекс
+# Прямой симплекс
 from AuxiliaryFun import (
     add_text_step, add_table_step, normalize_problem, find_initial_basis,
     calculate_deltas, determine_method, pivot_operation, build_tableau,
@@ -8,10 +8,6 @@ from AuxiliaryFun import (
 def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
     """
     Решает уже подготовленную задачу прямым симплекс-методом.
-    problem — нормализованная задача;
-    tableau — начальная симплексная таблица;
-    basis — начальный базис;
-    max_iterations — максимальное количество итераций.
     """
     c = problem["c"]
     names = problem["variable_names"]
@@ -26,11 +22,17 @@ def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
     method_info = determine_method(tableau, c, basis)
     add_text_step(steps, "Проверка начального плана", method_info["message"])
 
-    if method_info["method"] not in ("primal_simplex", "optimal"):
-        return make_result(
-            method_info["method"], method_info["message"], steps,
-            tableau=tableau, basis=basis, deltas=calculate_deltas(tableau, c, basis), problem=problem
-        )
+    # Если план уже оптимален, не запускаем цикл, а сразу выводим ответ
+    if method_info["method"] == "optimal":
+        all_values = recover_solution(tableau, basis, len(c))
+        solution = collapse_solution(all_values, mapping)
+        objective_value = sum(original_c[j] * solution[j] for j in range(len(original_c)))
+        add_text_step(steps, "Итоговое решение", 
+                      "План уже оптимален, итерации не требуются.",
+                      {"solution": solution[:], "objective_value": objective_value})
+        return make_result("optimal", "Оптимальное решение найдено.", steps,
+                           solution, objective_value, tableau, basis,
+                           calculate_deltas(tableau, c, basis), problem, all_variables=all_values)
 
     add_text_step(steps, "Начало прямого симплекс-метода", "Начальный план допустим. Переходим к проверке критерия оптимальности.")
 
@@ -47,11 +49,8 @@ def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
         if not negative_columns:
             add_text_step(steps, "Проверка критерия оптимальности", "Все оценки Delta_j неотрицательны. Оптимальное решение найдено.")
 
-            # Восстанавливаем значения всех переменных (в расширенном пространстве).
             all_values = recover_solution(tableau, basis, len(c))
-            # Сворачиваем свободные переменные обратно.
             solution = collapse_solution(all_values, mapping)
-            # Вычисляем значение исходной целевой функции.
             objective_value = sum(original_c[j] * solution[j] for j in range(len(original_c)))
 
             add_text_step(steps, "Итоговое решение", "Выписываем значения исходных переменных и вычисляем значение целевой функции.",
@@ -60,16 +59,13 @@ def primal_simplex_prepared(problem, tableau, basis, max_iterations=1000):
             return make_result("optimal", "Оптимальное решение найдено.", steps,
                 solution, objective_value, tableau, basis, deltas, problem, all_variables=all_values)
 
-        # 3. Выбираем ведущий столбец.
-        # Берём столбец с наиболее отрицательной оценкой.
+        # 3. Выбираем ведущий столбец (наиболее отрицательная оценка).
         pivot_column = min(negative_columns, key=lambda j: deltas[j])
         entering_variable = names[pivot_column]
 
         add_text_step(steps, "Выбор ведущего столбца", f"Выбираем столбец {entering_variable}, так как его оценка Delta = {deltas[pivot_column]:.6g} является наиболее отрицательной.")
 
         # 4. Выбираем ведущую строку.
-        # Используем правило минимального положительного отношения:
-        # theta_i = b_i / a_ij, если a_ij > 0.
         ratios = []
         for i, row in enumerate(tableau):
             coefficient = row[pivot_column]
