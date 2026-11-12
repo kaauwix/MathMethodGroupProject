@@ -22,7 +22,7 @@ def artificial_basis_prepared(problem, max_iterations=1000):
     if changed_rows:
         add_text_step(steps, "Преобразование ограничений", f"Строки {changed_rows} умножены на -1, чтобы свободные члены стали неотрицательными.")
 
-    # 2. Определяем строки, в которых нет единичного базисного столбца
+    # 2. Определяем строки, в которых нет базиса
     unit_rows = set()
     for j in range(len(work_A[0])):
         ones = [i for i in range(len(work_A)) if abs(work_A[i][j] - 1.0) <= EPSILON]
